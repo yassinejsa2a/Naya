@@ -4,7 +4,6 @@ Base Model for NAYA Travel Journal
 """
 
 from datetime import datetime
-from flask_sqlalchemy import SQLAlchemy
 import uuid
 
 from app import db

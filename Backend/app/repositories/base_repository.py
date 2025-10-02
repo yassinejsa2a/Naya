@@ -46,6 +46,7 @@ class SQLAlchemyRepository(BaseRepository):
         try:
             db.session.add(obj)
             db.session.commit()
+            db.session.refresh(obj)  # Refresh pour recharger les données
             return obj
         except Exception as e:
             db.session.rollback()
@@ -85,6 +86,7 @@ class SQLAlchemyRepository(BaseRepository):
                     setattr(obj, key, value)
             
             obj.save()
+            db.session.refresh(obj)  # Refresh après save
             return obj
         except Exception as e:
             db.session.rollback()
