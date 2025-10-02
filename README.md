@@ -28,26 +28,36 @@ NAYA is a travel journal platform where users can:
 
 ### Frontend
 - **HTML/CSS/JavaScript** - User interface
-- **GitHub Pages** - Hosting
+- **Google Maps Integration** - Interactive maps
+- **Responsive Design** - Mobile-friendly
 
 ## Project Structure
 
 ```
 /
-├── app.py              # Main Flask application
-├── config.py           # Configuration settings
-├── models.py           # Database models (User, Place, Review, Photo)
-├── requirements.txt    # Python dependencies
-├── api/
-│   ├── auth.py         # Authentication endpoints
-│   ├── reviews.py      # Reviews management
-│   ├── photos.py       # Photo upload and management
-│   └── places.py       # Places and Google Maps integration
-├── uploads/            # Photo storage
-└── tests/              # Unit tests
-    ├── test_auth.py
-    ├── test_reviews.py
-    └── test_places.py
+├── README.md           # This file
+├── .gitignore         # Git ignore rules
+├── Backend/           # Backend API (Flask)
+│   ├── app.py         # Main Flask application
+│   ├── config.py      # Configuration settings
+│   ├── models.py      # Database models (User, Place, Review, Photo)
+│   ├── requirements.txt # Python dependencies
+│   ├── .env.example   # Environment variables template
+│   ├── api/
+│   │   ├── auth.py    # Authentication endpoints
+│   │   ├── reviews.py # Reviews management
+│   │   ├── photos.py  # Photo upload and management
+│   │   └── places.py  # Places and Google Maps integration
+│   ├── uploads/       # Photo storage
+│   ├── tests/         # Unit tests
+│   └── README.md      # Backend documentation
+└── Frontend/          # Frontend application
+    ├── index.html     # Main HTML file
+    ├── src/
+    │   ├── css/       # Stylesheets
+    │   ├── js/        # JavaScript modules
+    │   └── assets/    # Static assets
+    └── README.md      # Frontend documentation
 ```
 
 ## API Endpoints
@@ -116,7 +126,7 @@ NAYA is a travel journal platform where users can:
 - caption
 - created_at
 
-## Setup Instructions
+## Quick Start
 
 ### 1. Clone Repository
 ```bash
@@ -124,54 +134,57 @@ git clone <repository-url>
 cd Naya
 ```
 
-### 2. Setup Python Environment
+### 2. Backend Setup
 ```bash
+cd Backend
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-### 3. Install Dependencies
-```bash
 pip install -r requirements.txt
-```
-
-### 4. Environment Variables
-Create a `.env` file:
-```bash
-SECRET_KEY=your-secret-key
-JWT_SECRET_KEY=your-jwt-secret
-GOOGLE_MAPS_API_KEY=your-google-maps-api-key
-DATABASE_URL=sqlite:///naya.db
-FLASK_DEBUG=True
-```
-
-### 5. Initialize Database
-```bash
+cp .env.example .env
+# Edit .env with your API keys
 python app.py
 ```
 
-### 6. Run Application
+### 3. Frontend Setup
 ```bash
-python app.py
+cd ../Frontend
+# Update Google Maps API key in index.html
+# Serve with any web server:
+python -m http.server 8000
+# or use Live Server in VS Code
 ```
 
-The API will be available at `http://localhost:5000`
+### 4. Access Application
+- **Backend API**: http://localhost:5000
+- **Frontend**: http://localhost:8000
+
+For detailed setup instructions, see the README files in Backend/ and Frontend/ directories.
 
 ## Development Workflow
 
 ### Branching Strategy
 - `main` - Production-ready code
-- `development` - Integration branch
-- `feature/*` - Feature branches
+- `development` - Integration branch  
+- `feature/*` - Feature branches (e.g., `feature/user-profile`)
+
+### Team Workflow
+1. **Yassine (Frontend)**: 
+   - Work on `feature/frontend-*` branches
+   - Focus on UI/UX and frontend functionality
+   - Integrate with backend APIs
+
+2. **Nawfel (Backend)**:
+   - Work on `feature/backend-*` branches  
+   - Develop API endpoints and business logic
+   - Manage database and authentication
 
 ### Code Review Process
 1. Create feature branch from `development`
 2. Implement feature with tests
 3. Create Pull Request to `development`
-4. Code review and testing
+4. Peer review and testing
 5. Merge to `development`
-6. Deploy to staging for validation
-7. Merge to `main` for production
+6. Regular merges to `main` for releases
 
 ## Testing
 
