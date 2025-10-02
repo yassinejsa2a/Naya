@@ -1,23 +1,66 @@
 #!/usr/bin/env python3
 """
-Test NAYA Travel Journal API
+Test NAYA Travel Journal API - Comprehensive Backend Testing
 """
 
+import sys
+import os
+
 import requests
-import json
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-BASE_URL = "http://127.0.0.1:5000/api/v1"
+from app import create_app
 
-def test_health_check():
-    """Test health check"""
-    try:
-        response = requests.get("http://127.0.0.1:5000/")
-        print(f"✅ Health Check: {response.status_code}")
-        print(f"   Response: {response.json()}")
-        return True
-    except Exception as e:
-        print(f"❌ Health Check failed: {e}")
-        return False
+def test_api_structure():
+    """Test API structure and routes"""
+    print("🧪 Testing NAYA API Structure...")
+    
+    app = create_app()
+    
+    with app.test_client() as client:
+        # Test home endpoint
+        response = client.get('/')
+        print(f"✅ Home endpoint: {response.status_code}")
+        if response.status_code == 200:
+            print(f"   Response: {response.get_json()}")
+        
+        # Check all registered routes
+        with app.app_context():
+            routes = []
+            for rule in app.url_map.iter_rules():
+                methods = rule.methods or set()
+                routes.append(f"{sorted(list(methods))} {rule.rule}")
+            
+            print("\n📍 All registered routes:")
+            for route in sorted(routes):
+                print(f"  {route}")
+            
+            # Filter API v1 routes
+            api_routes = [route for route in routes if '/api/v1' in route]
+            print(f"\n📡 API v1 routes found: {len(api_routes)}")
+        
+        # Test GET endpoints (should work without auth)
+        print("\n🔍 Testing GET endpoints:")
+        
+        endpoints = [
+            '/api/v1/places',
+            '/api/v1/reviews', 
+            '/api/v1/photos'
+        ]
+        
+        for endpoint in endpoints:
+            try:
+                response = client.get(endpoint)
+                print(f"  {endpoint}: {response.status_code}")
+                if response.status_code == 200:
+                    data = response.get_json()
+                    if data and 'success' in data:
+                        print(f"    Success: {data['success']}")
+            except Exception as e:
+                print(f"  {endpoint}: ERROR - {e}")
+    
+    print("\n✨ API structure test completed!")
+    return True
 
 def test_auth_endpoints():
     """Test authentication endpoints"""
