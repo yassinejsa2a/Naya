@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Unit tests for authentication endpoints
+Unit tests for NAYA Travel Journal authentication
 """
 import pytest
 import json
-from app import create_app
-from models import db, User
+from app import create_app, db
+from app.models.user import User
 
 @pytest.fixture
 def app():

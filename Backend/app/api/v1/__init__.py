@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 """
 API v1 package initialization
-Following HBNB pattern for API organization
 """
 
 from flask import Blueprint
 
 def create_v1_blueprint():
-    """
-    Create and configure the API v1 blueprint with all routes
-    Following HBNB pattern for blueprint organization
-    """
+    """Create and configure the API v1 blueprint with all routes"""
     # Create main v1 blueprint
     v1_bp = Blueprint('v1', __name__, url_prefix='/api/v1')
     

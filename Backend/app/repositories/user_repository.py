@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 User Repository for NAYA Travel Journal
-Adapted from HBNB user repository pattern
 """
 
 from typing import Optional, List
@@ -9,10 +8,7 @@ from app.models.user import User
 from app.repositories.base_repository import SQLAlchemyRepository
 
 class UserRepository(SQLAlchemyRepository):
-    """
-    User repository handling all user data operations
-    Following HBNB repository pattern
-    """
+    """User repository for data access operations"""
     
     def __init__(self):
         super().__init__(User)

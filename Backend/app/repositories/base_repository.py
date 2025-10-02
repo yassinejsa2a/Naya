@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-SQLAlchemy Repository Pattern for NAYA Travel Journal
-Adapted from HBNB repository pattern
+Repository Pattern for NAYA Travel Journal
 """
 
 from abc import ABC, abstractmethod
@@ -9,10 +8,7 @@ from typing import List, Optional, Dict, Any
 from app import db
 
 class BaseRepository(ABC):
-    """
-    Abstract base repository following HBNB pattern
-    Provides common CRUD operations interface
-    """
+    """Abstract base repository for CRUD operations"""
     
     def __init__(self, model_class):
         self.model_class = model_class
@@ -43,10 +39,7 @@ class BaseRepository(ABC):
         pass
 
 class SQLAlchemyRepository(BaseRepository):
-    """
-    SQLAlchemy implementation of repository pattern
-    Following HBNB SQLAlchemy repository structure
-    """
+    """SQLAlchemy repository implementation"""
     
     def create(self, obj) -> Any:
         """Create a new object in database"""

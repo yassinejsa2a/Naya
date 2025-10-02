@@ -101,7 +101,7 @@ def test_placeholder_endpoints(token):
 
 def main():
     """Run all API tests"""
-    print("🚀 Testing NAYA Travel Journal API")
+    print("Testing NAYA Travel Journal API")
     print("=" * 50)
     
     # Test health check
