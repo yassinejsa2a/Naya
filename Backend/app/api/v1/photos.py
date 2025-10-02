@@ -5,55 +5,199 @@ Photos API endpoints
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from app.services.photo_service import PhotoService
 
 photos_bp = Blueprint('photos', __name__)
+photo_service = PhotoService()
 
 @photos_bp.route('', methods=['GET'])
 def get_photos():
-    """Get all photos"""
-    return jsonify({"message": "Photos endpoint - to be implemented"}), 200
+    """Get photos with optional filters"""
+    try:
+        # Get query parameters
+        user_id = request.args.get('user_id')
+        review_id = request.args.get('review_id')
+        limit = request.args.get('limit', 20, type=int)
+        
+        # Apply filters
+        if user_id:
+            photos = photo_service.get_photos_by_user(user_id, limit)
+        elif review_id:
+            photos = photo_service.get_photos_by_review(review_id, limit)
+        else:
+            # Get recent photos by default
+            photos = photo_service.get_recent_photos(limit)
+        
+        return jsonify({
+            'success': True,
+            'photos': photos,
+            'count': len(photos)
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
 
 @photos_bp.route('', methods=['POST'])
 @jwt_required()
-def upload_photo():
-    """Upload new photo"""
-    return jsonify({"message": "Upload photo endpoint - to be implemented"}), 201
+def create_photo():
+    """Create new photo metadata"""
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        # Add user_id from JWT token
+        data['user_id'] = user_id
+        
+        result = photo_service.create_photo(data)
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
 
 @photos_bp.route('/<photo_id>', methods=['GET'])
 def get_photo(photo_id):
-    """Get specific photo"""
-    return jsonify({"message": f"Get photo {photo_id} - to be implemented"}), 200
+    """Get specific photo by ID"""
+    try:
+        photo = photo_service.get_photo_by_id(photo_id)
+        if not photo:
+            return jsonify({
+                'success': False,
+                'error': 'Photo not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'data': photo
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
 
 @photos_bp.route('/<photo_id>', methods=['PUT'])
 @jwt_required()
 def update_photo(photo_id):
-    """Update photo"""
-    return jsonify({"message": f"Update photo {photo_id} - to be implemented"}), 200
+    """Update photo metadata (only by owner)"""
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'No data provided'
+            }), 400
+        
+        result = photo_service.update_photo(photo_id, data, user_id)
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except PermissionError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 403
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
 
 @photos_bp.route('/<photo_id>', methods=['DELETE'])
 @jwt_required()
 def delete_photo(photo_id):
-    """Delete photo"""
-    return jsonify({"message": f"Delete photo {photo_id} - to be implemented"}), 204
+    """Delete photo (only by owner)"""
+    try:
+        user_id = get_jwt_identity()
+        
+        success = photo_service.delete_photo(photo_id, user_id)
+        if not success:
+            return jsonify({
+                'success': False,
+                'error': 'Photo not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'message': 'Photo deleted successfully'
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+    except PermissionError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 403
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
 
-@photos_bp.route('/<photo_id>/file', methods=['GET'])
-def get_photo_file(photo_id):
-    """Get photo file"""
-    return jsonify({"message": f"Get photo file {photo_id} - to be implemented"}), 200
-
-@photos_bp.route('/user', methods=['GET'])
+@photos_bp.route('/orphaned', methods=['GET'])
 @jwt_required()
-def get_user_photos():
-    """Get current user photos"""
-    current_user_id = get_jwt_identity()
-    return jsonify({"message": f"Get photos for user {current_user_id} - to be implemented"}), 200
-
-@photos_bp.route('/recent', methods=['GET'])
-def get_recent_photos():
-    """Get recent photos"""
-    return jsonify({"message": "Get recent photos - to be implemented"}), 200
-
-@photos_bp.route('/featured', methods=['GET'])
-def get_featured_photos():
-    """Get featured photos"""
-    return jsonify({"message": "Get featured photos - to be implemented"}), 200
+def get_orphaned_photos():
+    """Get photos not associated with any review (owner only)"""
+    try:
+        user_id = get_jwt_identity()
+        photos = photo_service.get_orphaned_photos(user_id)
+        
+        return jsonify({
+            'success': True,
+            'photos': photos,
+            'count': len(photos)
+        }), 200
+        
+    except PermissionError as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 403
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
