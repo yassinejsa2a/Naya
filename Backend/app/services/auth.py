@@ -55,22 +55,25 @@ class AuthService:
             'user': created_user.to_dict()
         }
     
-    def authenticate_user(self, email, password):
+    def authenticate_user(self, login, password):
         """
-        Authenticate user with email and password
+        Authenticate user with email/username and password
         Args:
-            email (str): User email
+            login (str): User email or username
             password (str): User password
         Returns:
             dict: Authentication result with tokens
         Raises:
             ValueError: If authentication fails
         """
-        if not email or not password:
-            raise ValueError("Email and password are required")
+        if not login or not password:
+            raise ValueError("Login and password are required")
         
-        # Find user by email
-        user = self.user_repository.get_by_email(email)
+        # Find user by email or username
+        user = self.user_repository.get_by_email(login)
+        if not user:
+            user = self.user_repository.get_by_username(login)
+        
         if not user:
             raise ValueError("Invalid email or password")
         
@@ -150,6 +153,8 @@ class AuthService:
         
         # Update user
         updated_user = self.user_repository.update(user_id, update_data)
+        if not updated_user:
+            raise ValueError("Failed to update user")
         
         return {
             'message': 'Profile updated successfully',
