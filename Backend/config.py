@@ -1,33 +1,104 @@
 #!/usr/bin/env python3
 """
-Configuration file for NAYA Travel Journal
+NAYA Travel Journal Configuration
 """
+
 import os
 from datetime import timedelta
 
 class Config:
-    """Configuration class for Flask app"""
+    """Base configuration"""
     
-    # Basic Flask configuration
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-change-in-production'
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() in ['true', '1', 'yes']
+    SECRET_KEY = os.getenv('SECRET_KEY', 'naya-travel-journal-secret-key-dev')
     
-    # Database configuration
-    DATABASE_URL = os.environ.get('DATABASE_URL') or 'sqlite:///naya.db'
-    SQLALCHEMY_DATABASE_URI = DATABASE_URL
+    # Database
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'DATABASE_URL', 
+        'sqlite:///naya_travel_journal.db'
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
     
-    # JWT configuration
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-change-in-production'
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(days=7)
+    # JWT
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
+    JWT_ALGORITHM = 'HS256'
     
-    # Google Maps API
-    GOOGLE_MAPS_API_KEY = os.environ.get('GOOGLE_MAPS_API_KEY')
+    # File uploads
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', 'uploads')
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     
-    # File upload configuration
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    # External APIs
+    GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
+    
+    # Other settings
+    RATELIMIT_STORAGE_URL = os.getenv('REDIS_URL', 'memory://')
+    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
+    DEFAULT_PAGE_SIZE = 20
+    MAX_PAGE_SIZE = 100
+
+class DevelopmentConfig(Config):
+    """Development environment configuration"""
+    DEBUG = True
+    TESTING = False
+    
+    # Development database
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'DEV_DATABASE_URL',
+        'sqlite:///naya_dev.db'
+    )
+    
+    # Less strict JWT expiration for development
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
+
+class TestingConfig(Config):
+    """Testing environment configuration"""
+    TESTING = True
+    DEBUG = True
+    
+    # In-memory database for tests
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    
+    # Disable CSRF for testing
+    WTF_CSRF_ENABLED = False
+    
+    # Short JWT expiration for testing
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
+
+class ProductionConfig(Config):
+    """Production environment configuration"""
+    DEBUG = False
+    TESTING = False
+    
+    # Production database (PostgreSQL recommended)
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        'DATABASE_URL',
+        'postgresql://user:password@localhost/naya_prod'
+    )
+    
+    # Strict JWT expiration for production
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=30)
+    
+    # Production file storage (could be AWS S3, etc.)
+    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', '/var/www/naya/uploads')
+
+# Configuration dictionary
+config = {
+    'development': DevelopmentConfig,
+    'testing': TestingConfig,
+    'production': ProductionConfig,
+    'default': DevelopmentConfig
+}
+
+def get_config():
+    """Get configuration class based on environment"""
+    env = os.getenv('FLASK_ENV', 'development').lower()
+    return config.get(env, config['default'])
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     
     @staticmethod

@@ -1,0 +1,36 @@
+# Git workflow for NAYA
+
+# Don't track environment files
+Backend/.env
+Backend/naya.db
+
+# Don't track uploads directory contents
+Backend/uploads/*
+!Backend/uploads/.gitkeep
+
+# Don't track Python cache
+Backend/__pycache__/
+Backend/**/__pycache__/
+Backend/*.pyc
+Backend/**/*.pyc
+
+# Don't track virtual environment
+Backend/venv/
+Backend/env/
+
+# Don't track IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Don't track OS files
+.DS_Store
+Thumbs.db
+
+# Don't track node modules if added later
+Frontend/node_modules/
+
+# Don't track build files
+Frontend/dist/
+Frontend/build/
