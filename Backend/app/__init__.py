@@ -7,6 +7,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
+from sqlalchemy import inspect, text
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -33,6 +34,7 @@ def create_app(config_object='config.Config'):
     # Create database tables
     with app.app_context():
         db.create_all()
+        _ensure_schema_integrity()
     
     @app.route('/')
     def home():
@@ -51,3 +53,12 @@ def create_app(config_object='config.Config'):
         return {"error": "Internal server error"}, 500
     
     return app
+
+
+def _ensure_schema_integrity():
+    """Ensure runtime schema matches latest model requirements."""
+    inspector = inspect(db.engine)
+    review_columns = {column['name'] for column in inspector.get_columns('reviews')}
+    if 'visit_date' not in review_columns:
+        with db.engine.begin() as connection:
+            connection.execute(text('ALTER TABLE reviews ADD COLUMN visit_date DATE'))

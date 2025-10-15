@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NAYA Travel Journal</title>
+    <title>Journal de voyage NAYA</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,12 +16,12 @@
     <header class="app-header">
       <div class="brand">
         <h1>NAYA</h1>
-        <p class="tagline">Travel journal for modern explorers</p>
+        <p class="tagline">Carnet de voyage pour explorateurs modernes</p>
       </div>
       <div class="header-controls">
         <div class="api-controls">
           <button id="api-config-btn" class="nav-btn nav-btn--ghost" type="button">
-            API settings
+            Paramètres API
           </button>
           <span
             id="api-indicator"
@@ -30,12 +30,13 @@
             aria-live="polite"
           ></span>
         </div>
-        <nav class="main-nav" aria-label="Main navigation">
-          <button class="nav-btn" data-target="feed-view">Feed</button>
-          <button class="nav-btn" data-target="add-review-view">Add Review</button>
-          <button class="nav-btn" data-target="profile-view">Profile</button>
-          <button id="logout-btn" class="nav-btn nav-btn--secondary">Log out</button>
+        <nav class="main-nav" aria-label="Navigation principale">
+          <button class="nav-btn" data-target="feed-view">Accueil</button>
+          <button class="nav-btn" data-target="add-review-view">Partager un avis</button>
+          <button class="nav-btn" data-target="map-view">Carte interactive</button>
+          <button class="nav-btn" data-target="profile-view">Profil</button>
         </nav>
+        <button id="logout-btn" class="nav-btn nav-btn--secondary">Se déconnecter</button>
       </div>
     </header>
 
@@ -50,102 +51,106 @@
       <section id="auth-view" class="view">
         <div class="auth-card">
           <div class="tabs" role="tablist">
-            <button class="tab active" data-tab="login" role="tab">Log in</button>
-            <button class="tab" data-tab="register" role="tab">Create account</button>
+            <button class="tab active" data-tab="login" role="tab">Connexion</button>
+            <button class="tab" data-tab="register" role="tab">Créer un compte</button>
           </div>
 
           <form id="login-form" class="form" autocomplete="on">
-            <h2>Welcome back</h2>
+            <h2>Heureux de vous revoir</h2>
             <label>
-              Email
+              E-mail
               <input type="email" name="email" required />
             </label>
             <label>
-              Password
+              Mot de passe
               <input type="password" name="password" minlength="8" required />
             </label>
-            <button type="submit" class="primary-btn">Log in</button>
+            <button type="submit" class="primary-btn">Se connecter</button>
           </form>
 
           <form id="register-form" class="form hidden" autocomplete="on">
-            <h2>Join the community</h2>
+            <h2>Rejoindre la communauté</h2>
             <div class="two-columns">
               <label>
-                Username
+                Nom d'utilisateur
                 <input type="text" name="username" minlength="3" required />
               </label>
               <label>
-                Email
+                E-mail
                 <input type="email" name="email" required />
               </label>
             </div>
             <label>
-              Password
+              Mot de passe
               <input type="password" name="password" minlength="8" required />
             </label>
             <label>
-              Confirm password
+              Confirmer le mot de passe
               <input type="password" name="confirmPassword" minlength="8" required />
             </label>
             <p class="form-hint">
-              Your password must be at least 8 characters and include a mix of
-              letters and numbers.
+              Votre mot de passe doit contenir au moins 8 caractères et mêler
+              lettres et chiffres.
             </p>
-            <button type="submit" class="primary-btn">Create account</button>
+            <button type="submit" class="primary-btn">Créer un compte</button>
           </form>
 
           <p id="auth-feedback" class="feedback" role="status" aria-live="polite"></p>
         </div>
       </section>
 
-      <section id="feed-view" class="view hidden" aria-label="Feed view">
+      <section id="feed-view" class="view hidden" aria-label="Fil d'actualités">
         <div class="view-header">
           <div>
-            <h2>Traveler feed</h2>
+            <h2>Fil des voyageurs</h2>
             <p class="subtitle">
-              Discover authentic activities shared by the NAYA community.
+              Découvrez les expériences authentiques partagées par la communauté NAYA.
             </p>
           </div>
           <form id="search-form" class="search" role="search">
-            <label class="sr-only" for="search-input">Search reviews</label>
+            <label class="sr-only" for="search-input">Rechercher un avis</label>
             <input
               id="search-input"
               type="search"
               name="search"
-              placeholder="Search by keyword, city, or activity"
+              placeholder="Rechercher par mot-clé, ville ou activité"
             />
-            <button type="submit" class="secondary-btn">Search</button>
+            <button type="submit" class="secondary-btn">Rechercher</button>
           </form>
         </div>
 
-        <div class="feed-content">
-          <aside class="map-panel" aria-label="Map">
-            <iframe
-              id="map-frame"
-              title="Highlighted location"
-              src="https://maps.google.com/maps?q=paris&t=&z=5&ie=UTF8&iwloc=&output=embed"
-              loading="lazy"
-              referrerpolicy="no-referrer-when-downgrade"
-            ></iframe>
-            <p class="map-hint">
-              Map results update when you select a review or search for a new
-              place.
+        <section class="feed-hero" aria-label="Mise en avant NAYA">
+          <div class="hero-content">
+            <h3>Des carnets inspirants</h3>
+            <p>
+              Parcourez les récits détaillés des membres et trouvez l'inspiration pour votre
+              prochaine échappée.
             </p>
-          </aside>
+          </div>
+          <div class="hero-stats">
+            <div>
+              <span class="stat-value" id="hero-review-count">0</span>
+              <span class="stat-label">avis partagés</span>
+            </div>
+            <div>
+              <span class="stat-value" id="hero-destinations">—</span>
+              <span class="stat-label">destinations à explorer</span>
+            </div>
+          </div>
+        </section>
 
-          <section class="feed-panel" aria-live="polite">
-            <ul id="reviews-list" class="reviews"></ul>
-            <p id="feed-feedback" class="feedback" role="status"></p>
-          </section>
-        </div>
+        <section class="feed-panel" aria-live="polite">
+          <ul id="reviews-list" class="reviews"></ul>
+          <p id="feed-feedback" class="feedback" role="status"></p>
+        </section>
       </section>
 
-      <section id="add-review-view" class="view hidden" aria-label="Add review">
+      <section id="add-review-view" class="view hidden" aria-label="Ajouter un avis">
         <div class="view-header">
           <div>
-            <h2>Share a new experience</h2>
+            <h2>Partager une nouvelle expérience</h2>
             <p class="subtitle">
-              Tell other travelers about the places that inspired you.
+              Inspirez d'autres voyageurs avec les lieux qui vous ont marqué.
             </p>
           </div>
         </div>
@@ -153,97 +158,138 @@
         <form id="review-form" class="form card">
           <div class="two-columns">
             <label>
-              Title
+              Titre
               <input type="text" name="title" minlength="3" required />
             </label>
             <label>
-              Rating
+              Note
               <select name="rating" required>
-                <option value="">Select</option>
-                <option value="1">1 - Needs improvement</option>
-                <option value="2">2 - Below expectations</option>
-                <option value="3">3 - Good</option>
-                <option value="4">4 - Great</option>
-                <option value="5">5 - Exceptional</option>
+                <option value="">Sélectionner</option>
+                <option value="1">1 - Peut mieux faire</option>
+                <option value="2">2 - En dessous des attentes</option>
+                <option value="3">3 - Bien</option>
+                <option value="4">4 - Superbe</option>
+                <option value="5">5 - Exceptionnel</option>
               </select>
             </label>
           </div>
 
           <label>
-            Place ID
+            Nom du lieu
+            <input
+              type="text"
+              name="place_name"
+              placeholder="Ex. Jardin Majorelle"
+            />
+          </label>
+
+          <div class="two-columns">
+            <label>
+              Ville
+              <input
+                type="text"
+                name="place_city"
+                placeholder="Ville du lieu"
+              />
+            </label>
+            <label>
+              Pays
+              <input
+                type="text"
+                name="place_country"
+                placeholder="Pays du lieu"
+              />
+            </label>
+          </div>
+
+          <label>
+            Identifiant du lieu (optionnel)
             <input
               type="text"
               name="place_id"
-              placeholder="Use an existing place identifier"
-              required
+              placeholder="Utilisez un identifiant existant si vous le connaissez"
             />
           </label>
 
           <label>
-            Review
+            Description du lieu (optionnel)
+            <input
+              type="text"
+              name="place_description"
+              placeholder="Quartier, ambiance, conseils pratiques…"
+            />
+          </label>
+
+          <p class="form-hint">
+            Indiquez le nom, la ville et le pays pour créer un nouveau lieu, ou
+            renseignez uniquement l'identifiant d'un lieu existant.
+          </p>
+
+          <label>
+            Avis
             <textarea
               name="content"
               rows="6"
               minlength="10"
-              placeholder="Share tips, highlights, and recommendations"
+              placeholder="Partagez vos conseils, coups de cœur et recommandations"
               required
             ></textarea>
           </label>
 
           <label>
-            Visit date
+            Date de visite
             <input type="date" name="visit_date" />
           </label>
 
-          <button type="submit" class="primary-btn">Publish review</button>
+          <button type="submit" class="primary-btn">Publier l'avis</button>
           <p id="review-feedback" class="feedback" role="status"></p>
         </form>
 
-        <section class="card upload-card" aria-label="Photo uploads">
-          <h3>Add a photo (optional)</h3>
+        <section class="card upload-card" aria-label="Ajouter une photo">
+          <h3>Ajouter une photo (optionnel)</h3>
           <p class="subtitle">
-            Attach a photo to one of your reviews to bring the story to life.
+            Joignez une photo à l'un de vos avis pour faire voyager la communauté.
           </p>
-          <form id="photo-form" class="form">
+          <form id="photo-form" class="form" enctype="multipart/form-data">
+            <label>
+              Image
+              <input
+                type="file"
+                name="photo_file"
+                accept="image/*"
+                required
+              />
+            </label>
             <div class="two-columns">
               <label>
-                Filename
+                Légende (optionnel)
                 <input
                   type="text"
-                  name="filename"
-                  placeholder="sunset_bali.jpg"
-                  required
+                  name="caption"
+                  placeholder="Décrivez le moment"
                 />
               </label>
               <label>
-                Review ID
+                Identifiant de l'avis (optionnel)
                 <input
                   type="text"
                   name="review_id"
-                  placeholder="Optional review identifier"
+                  placeholder="L'avis auquel lier la photo"
                 />
               </label>
             </div>
-            <label>
-              Caption
-              <input
-                type="text"
-                name="caption"
-                placeholder="Describe the moment"
-              />
-            </label>
-            <button type="submit" class="secondary-btn">Save photo</button>
+            <button type="submit" class="secondary-btn">Téléverser la photo</button>
             <p id="photo-feedback" class="feedback" role="status"></p>
           </form>
         </section>
       </section>
 
-      <section id="profile-view" class="view hidden" aria-label="Profile">
+      <section id="profile-view" class="view hidden" aria-label="Profil">
         <div class="view-header">
           <div>
-            <h2>Your profile</h2>
+            <h2>Votre profil</h2>
             <p class="subtitle">
-              Manage your details and keep track of your contributions.
+              Gérez vos informations et suivez vos contributions.
             </p>
           </div>
         </div>
@@ -251,71 +297,103 @@
         <section class="card profile-card">
           <dl class="profile-details">
             <div>
-              <dt>Username</dt>
+              <dt>Nom d'utilisateur</dt>
               <dd id="profile-username">—</dd>
             </div>
             <div>
-              <dt>Email</dt>
+              <dt>E-mail</dt>
               <dd id="profile-email">—</dd>
             </div>
             <div>
-              <dt>Member since</dt>
+              <dt>Membre depuis</dt>
               <dd id="profile-created">—</dd>
             </div>
             <div>
-              <dt>Total reviews</dt>
+              <dt>Total des avis</dt>
               <dd id="profile-review-count">0</dd>
             </div>
           </dl>
 
           <form id="profile-form" class="form">
-            <h3>Update profile</h3>
+            <h3>Mettre à jour le profil</h3>
             <div class="two-columns">
               <label>
-                Username
+                Nom d'utilisateur
                 <input type="text" name="username" minlength="3" required />
               </label>
               <label>
-                Bio
+                Biographie
                 <textarea
                   name="bio"
                   rows="3"
-                  placeholder="Share a short description of your travel style"
+                  placeholder="Décrivez brièvement votre façon de voyager"
                 ></textarea>
               </label>
             </div>
-            <button type="submit" class="secondary-btn">Save changes</button>
+            <button type="submit" class="secondary-btn">Enregistrer les modifications</button>
           </form>
 
           <form id="password-form" class="form">
-            <h3>Change password</h3>
+            <h3>Modifier le mot de passe</h3>
             <label>
-              Current password
+              Mot de passe actuel
               <input type="password" name="old_password" required />
             </label>
             <label>
-              New password
+              Nouveau mot de passe
               <input type="password" name="new_password" minlength="8" required />
             </label>
-            <button type="submit" class="secondary-btn">Update password</button>
+            <button type="submit" class="secondary-btn">Mettre à jour</button>
           </form>
 
           <form id="deactivate-form" class="form danger-zone">
-            <h3>Deactivate account</h3>
+            <h3>Désactiver le compte</h3>
             <p class="subtitle">
-              This action disables your account. You can reactivate it later by
-              contacting the NAYA team.
+              Cette action désactive votre compte. Vous pourrez le réactiver plus tard en contactant l'équipe NAYA.
             </p>
-            <button type="submit" class="danger-btn">Deactivate</button>
+            <button type="submit" class="danger-btn">Désactiver</button>
           </form>
 
           <p id="profile-feedback" class="feedback" role="status"></p>
         </section>
       </section>
+
+      <section id="map-view" class="view hidden" aria-label="Carte interactive">
+        <div class="view-header">
+          <div>
+            <h2>Explorer la carte</h2>
+            <p class="subtitle">
+              Visualisez les expériences partagées sur une carte immersive et trouvez l'étape parfaite.
+            </p>
+          </div>
+        </div>
+
+        <div class="map-layout">
+          <div class="map-wrapper" aria-label="Carte des expériences">
+            <iframe
+              id="map-frame"
+              title="Lieux mis en avant"
+              src="https://maps.google.com/maps?q=paris&t=&z=5&ie=UTF8&iwloc=&output=embed"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
+            <div class="map-overlay">
+              <h3>Carte des aventures</h3>
+              <p>Sélectionnez un avis dans le fil ou recherchez une destination pour mettre à jour la carte.</p>
+            </div>
+          </div>
+
+          <aside class="map-feed" aria-label="Derniers avis géolocalisés">
+            <h3>Derniers avis</h3>
+            <p class="subtitle">Cliquez sur un avis pour centrer la carte.</p>
+            <ul id="map-feed-list" class="map-feed-list"></ul>
+          </aside>
+        </div>
+      </section>
     </main>
 
     <footer class="app-footer">
-      <p>© <span id="year"></span> NAYA. Crafted for explorers worldwide.</p>
+      <p>© <span id="year"></span> NAYA. Créé pour les explorateurs du monde entier.</p>
     </footer>
 
     <script src="app.js" defer></script>

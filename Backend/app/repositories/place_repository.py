@@ -197,3 +197,12 @@ class PlaceRepository(SQLAlchemyRepository):
             True if exists, False otherwise
         """
         return Place.query.filter_by(name=name, city=city, country=country).first() is not None
+
+    def get_by_identity(self, name: str, city: str, country: str) -> Optional[Place]:
+        """
+        Get a place matching the exact name/city/country combination.
+        """
+        try:
+            return Place.query.filter_by(name=name, city=city, country=country).first()
+        except Exception:
+            return None

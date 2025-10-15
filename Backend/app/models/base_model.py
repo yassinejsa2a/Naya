@@ -3,7 +3,7 @@
 Base Model for NAYA Travel Journal
 """
 
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 
 from app import db
@@ -47,6 +47,8 @@ class BaseModel(db.Model):
             if key.startswith('_'):
                 continue
             if isinstance(value, datetime):
+                dict_repr[key] = value.isoformat()
+            elif isinstance(value, date):
                 dict_repr[key] = value.isoformat()
             else:
                 dict_repr[key] = value

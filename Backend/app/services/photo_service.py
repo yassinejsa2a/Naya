@@ -3,7 +3,14 @@
 Photo Service for NAYA Travel Journal
 """
 
+import os
+import uuid
 from typing import List, Optional, Dict, Any
+
+from flask import current_app, url_for
+from werkzeug.datastructures import FileStorage
+from werkzeug.utils import secure_filename
+
 from app.models.photo import Photo
 from app.repositories.photo_repository import PhotoRepository
 from app.repositories.user_repository import UserRepository
@@ -17,59 +24,80 @@ class PhotoService:
         self.user_repository = UserRepository()
         self.review_repository = ReviewRepository()
     
-    def create_photo(self, photo_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_photo(self, photo_data: Dict[str, Any], file_storage: Optional[FileStorage] = None) -> Dict[str, Any]:
         """
         Create a new photo record
         Args:
             photo_data (dict): Photo metadata
+            file_storage (FileStorage, optional): Uploaded photo file
         Returns:
             dict: Created photo info
         Raises:
             ValueError: If validation fails
         """
         # Validate required fields
-        required_fields = ['filename', 'user_id']
-        for field in required_fields:
-            if field not in photo_data or not photo_data[field]:
-                raise ValueError(f"Missing required field: {field}")
+        user_id = photo_data.get('user_id')
+        if not user_id:
+            raise ValueError("Missing required field: user_id")
+        
+        # Normalise review identifier
+        review_id = photo_data.get('review_id')
+        if isinstance(review_id, str):
+            review_id = review_id.strip() or None
+        if not review_id:
+            review_id = None
+        
+        file_storage = file_storage if file_storage and getattr(file_storage, 'filename', None) else None
+
+        if file_storage:
+            original_name = secure_filename(file_storage.filename)
+            if not original_name:
+                raise ValueError("Invalid file name")
+            
+            if not self._allowed_file(original_name):
+                allowed = ", ".join(sorted(self._allowed_extensions()))
+                raise ValueError(f"Unsupported file type. Allowed types: {allowed}")
+            
+            stored_filename = self._build_unique_filename(original_name)
+            storage_path, relative_path = self._resolve_storage_paths(stored_filename)
+            self._save_file(file_storage, storage_path)
+        else:
+            stored_filename = secure_filename(photo_data.get('filename', '') or '')
+            original_name = secure_filename(photo_data.get('original_name', '') or stored_filename)
+            relative_path = photo_data.get('file_path')
+            if not all([stored_filename, original_name, relative_path]):
+                raise ValueError("A photo file must be provided")
+        
+        description = (
+            photo_data.get('description') or
+            photo_data.get('caption') or
+            ''
+        )
         
         # Validate user exists
-        user = self.user_repository.get(photo_data['user_id'])
+        user = self.user_repository.get(user_id)
         if not user:
             raise ValueError("User not found")
         
+        review_obj = None
         # Validate review exists if provided
-        if 'review_id' in photo_data and photo_data['review_id']:
-            review = self.review_repository.get(photo_data['review_id'])
-            if not review:
+        if review_id:
+            review_obj = self.review_repository.get(review_id)
+            if not review_obj:
                 raise ValueError("Review not found")
-        
-        # Validate filename
-        filename = photo_data['filename']
-        if not filename or len(filename.strip()) == 0:
-            raise ValueError("Invalid filename format")
         
         # Create photo
         photo = Photo(
-            filename=filename,
-            file_path=photo_data.get('file_path', ''),
-            caption=photo_data.get('caption', ''),
-            user_id=photo_data['user_id'],
-            review_id=photo_data.get('review_id')
+            filename=stored_filename,
+            original_name=original_name,
+            file_path=relative_path,
+            description=description,
+            user_id=user_id,
+            review_id=review_id
         )
         
         created_photo = self.photo_repository.create(photo)
-        result = created_photo.to_dict()
-        
-        # Add user info
-        result['user'] = user.to_public_dict()
-        
-        # Add review info if available
-        if created_photo.review_id:
-            review = self.review_repository.get(created_photo.review_id)
-            result['review'] = review.to_dict() if review else None
-        
-        return result
+        return self._build_photo_response(created_photo, user=user, review=review_obj)
     
     def get_photo_by_id(self, photo_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -83,18 +111,7 @@ class PhotoService:
         if not photo:
             return None
         
-        photo_data = photo.to_dict()
-        
-        # Add user info
-        user = self.user_repository.get(photo.user_id)
-        photo_data['user'] = user.to_public_dict() if user else None
-        
-        # Add review info if available
-        if photo.review_id:
-            review = self.review_repository.get(photo.review_id)
-            photo_data['review'] = review.to_dict() if review else None
-        
-        return photo_data
+        return self._build_photo_response(photo)
     
     def update_photo(self, photo_id: str, photo_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """
@@ -122,9 +139,12 @@ class PhotoService:
             review = self.review_repository.get(photo_data['review_id'])
             if not review:
                 raise ValueError("Review not found")
+        # Normalise keys
+        if 'caption' in photo_data and 'description' not in photo_data:
+            photo_data['description'] = photo_data['caption']
         
         # Update allowed fields
-        allowed_fields = ['caption', 'review_id', 'file_path']
+        allowed_fields = ['description', 'review_id', 'file_path']
         update_dict = {k: v for k, v in photo_data.items() if k in allowed_fields}
         
         self.photo_repository.update(photo_id, update_dict)
@@ -133,18 +153,7 @@ class PhotoService:
         if not updated_photo:
             raise ValueError("Failed to update photo")
             
-        result = updated_photo.to_dict()
-        
-        # Add user info
-        user = self.user_repository.get(updated_photo.user_id)
-        result['user'] = user.to_public_dict() if user else None
-        
-        # Add review info if available
-        if updated_photo.review_id:
-            review = self.review_repository.get(updated_photo.review_id)
-            result['review'] = review.to_dict() if review else None
-        
-        return result
+        return self._build_photo_response(updated_photo)
     
     def delete_photo(self, photo_id: str, user_id: str) -> bool:
         """
@@ -166,7 +175,10 @@ class PhotoService:
         if photo.user_id != user_id:
             raise PermissionError("You can only delete your own photos")
         
-        return self.photo_repository.delete(photo_id)
+        removed = self.photo_repository.delete(photo_id)
+        if removed:
+            self._delete_file(photo.file_path)
+        return removed
     
     def get_photos_by_user(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
@@ -186,17 +198,87 @@ class PhotoService:
         result = []
         
         for photo in photos:
-            photo_data = photo.to_dict()
-            photo_data['user'] = user.to_public_dict()
-            
-            # Add review info if available
-            if photo.review_id:
-                review = self.review_repository.get(photo.review_id)
-                photo_data['review'] = review.to_dict() if review else None
-            
-            result.append(photo_data)
+            result.append(self._build_photo_response(photo, user=user))
         
         return result
+
+    def _build_unique_filename(self, original_name: str) -> str:
+        """Build a unique filename preserving the extension."""
+        extension = ''
+        if '.' in original_name:
+            extension = original_name.rsplit('.', 1)[1].lower()
+        unique_id = uuid.uuid4().hex
+        return f"{unique_id}.{extension}" if extension else unique_id
+
+    def _allowed_extensions(self):
+        config_extensions = current_app.config.get('ALLOWED_EXTENSIONS')
+        if config_extensions:
+            return {ext.lower() for ext in config_extensions}
+        return {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+    def _allowed_file(self, filename: str) -> bool:
+        """Check if the file extension is allowed."""
+        if '.' not in filename:
+            return False
+        extension = filename.rsplit('.', 1)[1].lower()
+        return extension in self._allowed_extensions()
+
+    def _resolve_storage_paths(self, filename: str):
+        """Compute absolute storage path and relative DB path."""
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+        if os.path.isabs(upload_folder):
+            storage_dir = upload_folder
+            relative_path = os.path.join(upload_folder, filename)
+        else:
+            storage_dir = os.path.join(current_app.root_path, upload_folder)
+            relative_path = os.path.join(upload_folder, filename)
+        os.makedirs(storage_dir, exist_ok=True)
+        absolute_path = os.path.join(storage_dir, filename)
+        return absolute_path, relative_path
+
+    def _save_file(self, file_storage: FileStorage, destination: str) -> None:
+        """Persist the uploaded file on disk."""
+        file_storage.save(destination)
+
+    def _delete_file(self, file_path: Optional[str]) -> None:
+        """Remove a file from disk if it exists."""
+        if not file_path:
+            return
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+        if os.path.isabs(file_path):
+            absolute_path = file_path
+        else:
+            if os.path.isabs(upload_folder):
+                absolute_path = os.path.join(upload_folder, os.path.basename(file_path))
+            else:
+                absolute_path = os.path.join(current_app.root_path, file_path)
+        if os.path.exists(absolute_path):
+            try:
+                os.remove(absolute_path)
+            except OSError:
+                pass
+
+    def _build_photo_response(self, photo: Photo, user=None, review=None) -> Dict[str, Any]:
+        """Build a serialisable representation for a photo instance."""
+        data = photo.to_dict()
+
+        if user is None:
+            user = self.user_repository.get(photo.user_id)
+        data['user'] = user.to_public_dict() if user else None
+
+        if photo.review_id:
+            if review is None:
+                review = self.review_repository.get(photo.review_id)
+            data['review'] = review.to_dict() if review else None
+        else:
+            data['review'] = None
+
+        try:
+            data['file_url'] = url_for('photos.serve_photo_file', filename=photo.filename, _external=True)
+        except RuntimeError:
+            data['file_url'] = None
+        data['caption'] = data.get('description')
+        return data
     
     def get_photos_by_review(self, review_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
@@ -213,19 +295,7 @@ class PhotoService:
             raise ValueError("Review not found")
         
         photos = self.photo_repository.get_by_review(review_id, limit)
-        result = []
-        
-        for photo in photos:
-            photo_data = photo.to_dict()
-            photo_data['review'] = review.to_dict()
-            
-            # Add user info
-            user = self.user_repository.get(photo.user_id)
-            photo_data['user'] = user.to_public_dict() if user else None
-            
-            result.append(photo_data)
-        
-        return result
+        return [self._build_photo_response(photo, review=review) for photo in photos]
     
     def get_recent_photos(self, limit: int = 20) -> List[Dict[str, Any]]:
         """
@@ -236,23 +306,7 @@ class PhotoService:
             list: Recent photos with user and review info
         """
         photos = self.photo_repository.get_recent_photos(limit)
-        result = []
-        
-        for photo in photos:
-            photo_data = photo.to_dict()
-            
-            # Add user info
-            user = self.user_repository.get(photo.user_id)
-            photo_data['user'] = user.to_public_dict() if user else None
-            
-            # Add review info if available
-            if photo.review_id:
-                review = self.review_repository.get(photo.review_id)
-                photo_data['review'] = review.to_dict() if review else None
-            
-            result.append(photo_data)
-        
-        return result
+        return [self._build_photo_response(photo) for photo in photos]
     
     def get_orphaned_photos(self, user_id: str) -> List[Dict[str, Any]]:
         """
@@ -265,15 +319,5 @@ class PhotoService:
         # Get all orphaned photos and filter by user
         all_orphaned = self.photo_repository.get_orphaned_photos()
         photos = [photo for photo in all_orphaned if photo.user_id == user_id]
-        result = []
-        
-        # Get user info once
         user = self.user_repository.get(user_id)
-        user_info = user.to_public_dict() if user else None
-        
-        for photo in photos:
-            photo_data = photo.to_dict()
-            photo_data['user'] = user_info
-            result.append(photo_data)
-        
-        return result
+        return [self._build_photo_response(photo, user=user) for photo in photos]

@@ -3,7 +3,9 @@
 Photos API endpoints
 """
 
-from flask import Blueprint, request, jsonify
+import os
+
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services.photo_service import PhotoService
 
@@ -51,18 +53,31 @@ def create_photo():
     """Create new photo metadata"""
     try:
         user_id = get_jwt_identity()
-        data = request.get_json()
-        
+        data = {}
+        file_storage = None
+
+        if request.content_type and 'multipart/form-data' in request.content_type.lower():
+            data = request.form.to_dict()
+            file_storage = (
+                request.files.get('photo_file')
+                or request.files.get('file')
+                or (next(iter(request.files.values())) if request.files else None)
+            )
+        elif request.is_json:
+            data = request.get_json() or {}
+        else:
+            data = request.get_json(silent=True) or {}
+
         if not data:
             return jsonify({
                 'success': False,
                 'error': 'No data provided'
             }), 400
-        
+
         # Add user_id from JWT token
         data['user_id'] = user_id
         
-        result = photo_service.create_photo(data)
+        result = photo_service.create_photo(data, file_storage=file_storage)
         return jsonify({
             'success': True,
             'data': result
@@ -76,8 +91,18 @@ def create_photo():
     except Exception as e:
         return jsonify({
             'success': False,
-            'error': 'Internal server error'
-        }), 500
+                'error': 'Internal server error'
+            }), 500
+
+@photos_bp.route('/files/<path:filename>', methods=['GET'])
+def serve_photo_file(filename):
+    """Serve uploaded photo files."""
+    upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+    if not os.path.isabs(upload_folder):
+        directory = os.path.join(current_app.root_path, upload_folder)
+    else:
+        directory = upload_folder
+    return send_from_directory(directory, filename)
 
 @photos_bp.route('/<photo_id>', methods=['GET'])
 def get_photo(photo_id):

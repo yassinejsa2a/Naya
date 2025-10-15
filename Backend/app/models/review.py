@@ -13,6 +13,7 @@ class Review(BaseModel):
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     rating = db.Column(db.Integer, nullable=False)
+    visit_date = db.Column(db.Date, nullable=True)
     
     # Foreign keys
     user_id = db.Column(db.String(60), db.ForeignKey('users.id'), nullable=False)

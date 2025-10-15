@@ -9,15 +9,44 @@ const authView = document.getElementById('auth-view');
 const feedView = document.getElementById('feed-view');
 const addReviewView = document.getElementById('add-review-view');
 const profileView = document.getElementById('profile-view');
+const mapView = document.getElementById('map-view');
+
+const loginForm = document.getElementById('login-form');
+const registerForm = document.getElementById('register-form');
+const reviewForm = document.getElementById('review-form');
+const photoForm = document.getElementById('photo-form');
+const searchForm = document.getElementById('search-form');
+const profileForm = document.getElementById('profile-form');
+const passwordForm = document.getElementById('password-form');
+const deactivateForm = document.getElementById('deactivate-form');
+
+const authFeedback = document.getElementById('auth-feedback');
+const feedFeedback = document.getElementById('feed-feedback');
+const reviewFeedback = document.getElementById('review-feedback');
+const photoFeedback = document.getElementById('photo-feedback');
+const profileFeedback = document.getElementById('profile-feedback');
+
+const reviewsList = document.getElementById('reviews-list');
+const mapFrame = document.getElementById('map-frame');
+const mapFeedList = document.getElementById('map-feed-list');
+const heroReviewCount = document.getElementById('hero-review-count');
+const heroDestinations = document.getElementById('hero-destinations');
+
+const profileUsername = document.getElementById('profile-username');
+const profileEmail = document.getElementById('profile-email');
+const profileCreated = document.getElementById('profile-created');
+const profileReviewCount = document.getElementById('profile-review-count');
+
+const tabs = Array.from(document.querySelectorAll('.tab'));
 
 const normaliseApiBaseUrl = (value) => {
   if (!value) {
-    throw new Error('The API base URL cannot be empty.');
+    throw new Error("L'URL de base de l'API ne peut pas être vide.");
   }
 
   let candidate = value.trim();
   if (!candidate) {
-    throw new Error('The API base URL cannot be empty.');
+    throw new Error("L'URL de base de l'API ne peut pas être vide.");
   }
 
   if (!/^https?:\/\//i.test(candidate)) {
@@ -42,7 +71,7 @@ const detectDefaultApiBaseUrl = () => {
     try {
       return normaliseApiBaseUrl(metaTag.content);
     } catch (error) {
-      console.warn('NAYA: invalid API base defined in <meta name="naya-api-base">.', error);
+      console.warn('NAYA : URL de base API invalide définie dans <meta name="naya-api-base">.', error);
     }
   }
 
@@ -50,7 +79,7 @@ const detectDefaultApiBaseUrl = () => {
     try {
       return normaliseApiBaseUrl(window.location.origin);
     } catch (error) {
-      console.warn('NAYA: unable to derive API base URL from window.location.origin.', error);
+      console.warn("NAYA : impossible de déterminer l'URL de base de l'API depuis window.location.origin.", error);
     }
   }
 
@@ -68,21 +97,36 @@ try {
     window.localStorage.setItem('naya-api-base', apiBaseUrl);
   }
 } catch (error) {
-  console.warn('NAYA: invalid stored API base URL, resetting to default.', error);
+  console.warn("NAYA : URL de base API stockée invalide, retour à la valeur par défaut.", error);
   window.localStorage.removeItem('naya-api-base');
   apiBaseUrl = defaultApiBaseUrl;
 }
 
+let authToken = window.localStorage.getItem('naya-token');
+let currentUser = null;
+let lastReviews = [];
+let highlightedReviewId = null;
 let globalMessageTimeoutId;
+let lastCreatedReviewId = null;
+
+const formatDate = (iso) => {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+};
 
 const updateApiIndicator = () => {
   if (!apiIndicator) return;
   try {
     const url = new URL(apiBaseUrl);
-    apiIndicator.textContent = `API: ${url.origin}${url.pathname}`;
+    apiIndicator.textContent = `API : ${url.origin}${url.pathname}`;
     apiIndicator.title = `${url.origin}${url.pathname}`;
   } catch (error) {
-    apiIndicator.textContent = `API: ${apiBaseUrl}`;
+    apiIndicator.textContent = `API : ${apiBaseUrl}`;
     apiIndicator.title = apiBaseUrl;
   }
 };
@@ -125,8 +169,8 @@ const setApiBaseUrl = (value, { persist = true } = {}) => {
 
 const handleApiConfigClick = () => {
   const currentValue = apiBaseUrl;
-  const hint = 'Example: https://naya-backend.example.com/api/v1';
-  const userInput = window.prompt(`Enter the base URL of your NAYA API.\n${hint}`, currentValue);
+  const hint = 'Exemple : https://naya-backend.exemple.com/api/v1';
+  const userInput = window.prompt(`Indiquez l'URL de base de votre API NAYA.\n${hint}`, currentValue);
 
   if (userInput === null) {
     return;
@@ -136,7 +180,7 @@ const handleApiConfigClick = () => {
 
   if (!trimmed) {
     setApiBaseUrl(defaultApiBaseUrl, { persist: false });
-    showGlobalMessage(`API base reset to default (${defaultApiBaseUrl}).`);
+    showGlobalMessage(`URL de base réinitialisée (${defaultApiBaseUrl}).`);
     if (authToken) {
       loadFeed();
       loadProfile();
@@ -147,52 +191,416 @@ const handleApiConfigClick = () => {
   try {
     const normalised = normaliseApiBaseUrl(trimmed);
     setApiBaseUrl(normalised, { persist: true });
-    showGlobalMessage(`API base updated to ${normalised}.`);
+    showGlobalMessage(`URL de base mise à jour : ${normalised}.`);
     if (authToken) {
       loadFeed();
       loadProfile();
     }
   } catch (error) {
-    showGlobalMessage(error.message || 'The API base URL is not valid.', true);
+    showGlobalMessage(error.message || "L'URL de base de l'API n'est pas valide.", true);
   }
 };
 
-const loginForm = document.getElementById('login-form');
-const registerForm = document.getElementById('register-form');
-const reviewForm = document.getElementById('review-form');
-const photoForm = document.getElementById('photo-form');
-const searchForm = document.getElementById('search-form');
-const profileForm = document.getElementById('profile-form');
-const passwordForm = document.getElementById('password-form');
-const deactivateForm = document.getElementById('deactivate-form');
+const setFeedback = (element, message, isError = false) => {
+  if (!element) return;
+  element.textContent = message;
+  element.classList.toggle('error', Boolean(message) && isError);
+};
 
-const authFeedback = document.getElementById('auth-feedback');
-const feedFeedback = document.getElementById('feed-feedback');
-const reviewFeedback = document.getElementById('review-feedback');
-const photoFeedback = document.getElementById('photo-feedback');
-const profileFeedback = document.getElementById('profile-feedback');
-
-const reviewsList = document.getElementById('reviews-list');
-const mapFrame = document.getElementById('map-frame');
-
-const profileUsername = document.getElementById('profile-username');
-const profileEmail = document.getElementById('profile-email');
-const profileCreated = document.getElementById('profile-created');
-const profileReviewCount = document.getElementById('profile-review-count');
-
-const tabs = Array.from(document.querySelectorAll('.tab'));
-
-let authToken = window.localStorage.getItem('naya-token');
-let currentUser = null;
-
-const formatDate = (iso) => {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
+const buildQueryString = (params = {}) => {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.append(key, value);
+    }
   });
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+};
+
+const normaliseFieldValue = (value) => (typeof value === 'string' ? value.trim() : '');
+
+const findExistingPlaceId = async (name, city, country) => {
+  const query = buildQueryString({
+    search: name,
+    city,
+    country,
+    limit: 10,
+  });
+
+  if (!query) {
+    return null;
+  }
+
+  try {
+    const response = await fetchJson(`/places${query}`);
+    const candidates = Array.isArray(response?.places) ? response.places : [];
+    const targetName = name.toLowerCase();
+    const targetCity = city.toLowerCase();
+    const targetCountry = country.toLowerCase();
+
+    const matchingPlace = candidates.find((place) => {
+      const placeName = normaliseFieldValue(place?.name || '').toLowerCase();
+      const placeCity = normaliseFieldValue(place?.city || '').toLowerCase();
+      const placeCountry = normaliseFieldValue(place?.country || '').toLowerCase();
+      return placeName === targetName && placeCity === targetCity && placeCountry === targetCountry;
+    });
+
+    return matchingPlace?.id ?? null;
+  } catch (error) {
+    console.warn('NAYA : impossible de rechercher un lieu existant.', error);
+    return null;
+  }
+};
+
+const ensurePlaceId = async (payload) => {
+  const directId = normaliseFieldValue(payload.place_id || '');
+  if (directId) {
+    return directId;
+  }
+
+  const name = normaliseFieldValue(payload.place_name || '');
+  const city = normaliseFieldValue(payload.place_city || '');
+  const country = normaliseFieldValue(payload.place_country || '');
+  const description = normaliseFieldValue(payload.place_description || '');
+
+  if (!name || !city || !country) {
+    throw new Error('Renseignez le nom, la ville et le pays du lieu ou fournissez son identifiant.');
+  }
+
+  let existingId = await findExistingPlaceId(name, city, country);
+  if (existingId) {
+    return existingId;
+  }
+
+  try {
+    const response = await fetchJson(
+      '/places',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          city,
+          country,
+          description: description || undefined,
+        }),
+      },
+      { requiresAuth: true }
+    );
+
+    const createdPlace = response?.data;
+    if (createdPlace?.id) {
+      return createdPlace.id;
+    }
+
+    // Certains endpoints renvoient la place sous data.place
+    if (createdPlace?.place?.id) {
+      return createdPlace.place.id;
+    }
+  } catch (error) {
+    if (error.message && error.message.toLowerCase().includes('already exists')) {
+      existingId = await findExistingPlaceId(name, city, country);
+      if (existingId) {
+        return existingId;
+      }
+    }
+    throw error;
+  }
+
+  throw new Error("Impossible de déterminer l'identifiant du lieu.");
+};
+
+const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) => {
+  const url = `${apiBaseUrl}${endpoint}`;
+  const headers = options.headers ? { ...options.headers } : {};
+
+  if (options.body && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (requiresAuth) {
+    if (!authToken) throw new Error('Authentification requise');
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  let response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } catch (networkError) {
+    console.error("NAYA : erreur réseau lors de l'appel à l'API.", networkError);
+    showGlobalMessage(
+      `Impossible de joindre l'API à ${apiBaseUrl}. Vérifiez l'adresse dans « Paramètres API » ainsi que votre connexion.`,
+      true,
+      8000
+    );
+    throw new Error(
+      `Impossible de joindre l'API à ${apiBaseUrl}. Merci de vérifier votre connexion ou vos paramètres API.`
+    );
+  }
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const errorMessage = data.error || data.message || 'La requête a échoué';
+    throw new Error(errorMessage);
+  }
+
+  return data;
+};
+
+const updateHeroStats = (reviews = []) => {
+  if (heroReviewCount) {
+    heroReviewCount.textContent = reviews.length.toLocaleString('fr-FR');
+  }
+
+  if (heroDestinations) {
+    if (!reviews.length) {
+      heroDestinations.textContent = '—';
+      return;
+    }
+
+    const destinations = new Set();
+    reviews.forEach((review) => {
+      const place = review.place || {};
+      const identifier = [place.city || place.name || '', place.country || '']
+        .map((part) => part.trim().toLowerCase())
+        .filter(Boolean)
+        .join('|');
+      if (identifier) {
+        destinations.add(identifier);
+      }
+    });
+    heroDestinations.textContent = destinations.size ? destinations.size.toLocaleString('fr-FR') : '—';
+  }
+};
+
+const highlightReviewItems = () => {
+  const id = highlightedReviewId != null ? String(highlightedReviewId) : null;
+
+  if (reviewsList) {
+    const cards = reviewsList.querySelectorAll('.review-card');
+    cards.forEach((card) => {
+      const isActive = id && card.dataset.reviewId === id;
+      card.classList.toggle('active', Boolean(isActive));
+    });
+  }
+
+  if (mapFeedList) {
+    const items = mapFeedList.querySelectorAll('li');
+    items.forEach((item) => {
+      const isActive = id && item.dataset.reviewId === id;
+      item.classList.toggle('active', Boolean(isActive));
+    });
+  }
+};
+
+const renderMapFeed = (reviews = []) => {
+  if (!mapFeedList) return;
+  mapFeedList.innerHTML = '';
+
+  if (!reviews.length) {
+    const emptyItem = document.createElement('li');
+    emptyItem.className = 'map-feed-empty';
+    emptyItem.textContent = 'Aucun avis à afficher pour le moment.';
+    mapFeedList.appendChild(emptyItem);
+    highlightReviewItems();
+    return;
+  }
+
+  reviews.forEach((review) => {
+    const item = document.createElement('li');
+    item.tabIndex = 0;
+    item.dataset.reviewId = review.id;
+
+    const title = document.createElement('span');
+    title.className = 'map-feed-title';
+    title.textContent = review.title || 'Avis sans titre';
+
+    const meta = document.createElement('span');
+    meta.className = 'map-feed-meta';
+    const locationLabel = review.place?.city
+      ? `${review.place.city}, ${review.place.country || ''}`.trim()
+      : review.place?.name || 'Lieu non cartographié';
+    meta.textContent = `${locationLabel} • ★ ${review.rating ?? '—'}`;
+
+    item.append(title, meta);
+
+    item.addEventListener('click', () => highlightOnMap(review));
+    item.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        highlightOnMap(review);
+      }
+    });
+
+    mapFeedList.appendChild(item);
+  });
+
+  highlightReviewItems();
+};
+
+const renderReviews = (reviews = []) => {
+  reviewsList.innerHTML = '';
+
+  if (!reviews.length) {
+    setFeedback(feedFeedback, 'Aucun avis pour le moment. Soyez le premier à partager une aventure !');
+    updateHeroStats([]);
+    renderMapFeed([]);
+    return;
+  }
+
+  setFeedback(feedFeedback, '');
+
+  const fragment = document.createDocumentFragment();
+
+  const ids = reviews.map((review) => String(review.id));
+  if (highlightedReviewId != null && !ids.includes(String(highlightedReviewId))) {
+    highlightedReviewId = null;
+  }
+
+  reviews.forEach((review) => {
+    const item = document.createElement('li');
+    item.className = 'review-card';
+    item.tabIndex = 0;
+    item.dataset.reviewId = review.id;
+    item.addEventListener('click', () => highlightOnMap(review));
+    item.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        highlightOnMap(review);
+      }
+    });
+
+    const title = document.createElement('h3');
+    title.textContent = review.title || 'Expérience sans titre';
+
+    const meta = document.createElement('div');
+    meta.className = 'review-meta';
+
+    const author = document.createElement('span');
+    author.textContent = review.user?.username ? `Par ${review.user.username}` : 'Voyageur anonyme';
+
+    const location = document.createElement('span');
+    location.textContent = review.place?.city
+      ? `${review.place.city}, ${review.place.country || ''}`.trim()
+      : review.place?.name || 'Lieu non cartographié';
+
+    const rating = document.createElement('span');
+    rating.className = 'rating';
+    rating.textContent = `★ ${review.rating ?? '—'}`;
+
+    const created = document.createElement('span');
+    created.textContent = formatDate(review.created_at);
+
+    const metaChildren = [author, location, rating, created];
+    if (review.visit_date) {
+      const visitDate = document.createElement('span');
+      visitDate.textContent = `Visité le ${formatDate(review.visit_date)}`;
+      metaChildren.push(visitDate);
+    }
+
+    meta.append(...metaChildren);
+
+    const content = document.createElement('p');
+    content.textContent = review.content || 'Aucune description fournie.';
+
+    item.append(title, meta, content);
+
+    if (Array.isArray(review.photos) && review.photos.length) {
+      const gallery = document.createElement('div');
+      gallery.className = 'review-gallery';
+
+      review.photos.forEach((photo) => {
+        if (!photo?.file_url) return;
+
+        const figure = document.createElement('figure');
+        figure.className = 'review-photo';
+
+        const img = document.createElement('img');
+        img.src = photo.file_url;
+        img.alt = photo.caption || `Photo de ${review.title || 'l\'avis'}`;
+        img.loading = 'lazy';
+        figure.appendChild(img);
+
+        if (photo.caption) {
+          const caption = document.createElement('figcaption');
+          caption.textContent = photo.caption;
+          figure.appendChild(caption);
+        }
+
+        gallery.appendChild(figure);
+      });
+
+      if (gallery.children.length) {
+        item.appendChild(gallery);
+      }
+    }
+
+    fragment.appendChild(item);
+  });
+
+  reviewsList.appendChild(fragment);
+  updateHeroStats(reviews);
+  renderMapFeed(reviews);
+  highlightReviewItems();
+};
+
+const highlightOnMap = (review) => {
+  if (!mapFrame) return;
+  const place = review.place || {};
+  let mapUrl;
+  if (place.latitude && place.longitude) {
+    mapUrl = `https://maps.google.com/maps?q=${place.latitude},${place.longitude}&z=12&output=embed`;
+  } else if (place.city || place.name) {
+    const query = encodeURIComponent(`${place.name || ''} ${place.city || ''} ${place.country || ''}`.trim());
+    mapUrl = `https://maps.google.com/maps?q=${query}&z=10&output=embed`;
+  }
+
+  if (mapUrl) {
+    mapFrame.src = mapUrl;
+  }
+
+  if (review?.id != null) {
+    highlightedReviewId = review.id;
+    highlightReviewItems();
+  }
+};
+
+const loadFeed = async (query = {}) => {
+  try {
+    setFeedback(feedFeedback, 'Chargement des aventures…');
+    const qs = buildQueryString(query);
+    const data = await fetchJson(`/reviews${qs}`);
+    lastReviews = data.reviews || [];
+    renderReviews(lastReviews);
+    setFeedback(feedFeedback, lastReviews.length ? '' : '');
+  } catch (error) {
+    console.error(error);
+    setFeedback(feedFeedback, error.message || 'Impossible de charger les avis', true);
+    updateHeroStats([]);
+    renderMapFeed([]);
+  }
+};
+
+const loadProfile = async () => {
+  if (!authToken) return;
+  try {
+    const [profile, stats] = await Promise.all([
+      fetchJson('/auth/profile', { method: 'GET' }, { requiresAuth: true }),
+      fetchJson('/auth/stats', { method: 'GET' }, { requiresAuth: true }),
+    ]);
+
+    currentUser = profile;
+    profileUsername.textContent = profile.username || 'Voyageur';
+    profileEmail.textContent = profile.email || '—';
+    profileCreated.textContent = formatDate(profile.created_at);
+    profileReviewCount.textContent = stats.reviews_count ?? '0';
+
+    profileForm.username.value = profile.username || '';
+    profileForm.bio.value = profile.bio || '';
+  } catch (error) {
+    console.error(error);
+    setFeedback(profileFeedback, error.message || 'Échec du chargement du profil', true);
+  }
 };
 
 const saveAuthState = (token, user) => {
@@ -223,168 +631,10 @@ const showView = (viewId) => {
   views.forEach((view) => {
     view.classList.toggle('hidden', view.id !== viewId);
   });
-};
-
-const setFeedback = (element, message, isError = false) => {
-  if (!element) return;
-  element.textContent = message;
-  element.classList.toggle('error', Boolean(message) && isError);
-};
-
-const buildQueryString = (params = {}) => {
-  const searchParams = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      searchParams.append(key, value);
-    }
+  navButtons.forEach((button) => {
+    const isActive = button.dataset.target === viewId;
+    button.classList.toggle('active', isActive);
   });
-  const query = searchParams.toString();
-  return query ? `?${query}` : '';
-};
-
-const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) => {
-  const url = `${apiBaseUrl}${endpoint}`;
-  const headers = options.headers ? { ...options.headers } : {};
-
-  if (options.body && !(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  if (requiresAuth) {
-    if (!authToken) throw new Error('Authentication required');
-    headers.Authorization = `Bearer ${authToken}`;
-  }
-
-  let response;
-  try {
-    response = await fetch(url, { ...options, headers });
-  } catch (networkError) {
-    console.error('NAYA: network error while reaching the API.', networkError);
-    showGlobalMessage(
-      `Unable to reach the API at ${apiBaseUrl}. Check the address in “API settings” and your network connection.`,
-      true,
-      8000
-    );
-    throw new Error(
-      `Unable to reach the API at ${apiBaseUrl}. Please verify your connection or API settings.`
-    );
-  }
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const errorMessage = data.error || data.message || 'Request failed';
-    throw new Error(errorMessage);
-  }
-
-  return data;
-};
-
-const renderReviews = (reviews = []) => {
-  reviewsList.innerHTML = '';
-
-  if (!reviews.length) {
-    setFeedback(feedFeedback, 'No reviews found yet. Be the first to share an adventure!');
-    return;
-  }
-
-  setFeedback(feedFeedback, '');
-
-  const fragment = document.createDocumentFragment();
-
-  reviews.forEach((review) => {
-    const item = document.createElement('li');
-    item.className = 'review-card';
-    item.tabIndex = 0;
-    item.dataset.reviewId = review.id;
-    item.addEventListener('click', () => highlightOnMap(review));
-    item.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        highlightOnMap(review);
-      }
-    });
-
-    const title = document.createElement('h3');
-    title.textContent = review.title || 'Untitled experience';
-
-    const meta = document.createElement('div');
-    meta.className = 'review-meta';
-
-    const author = document.createElement('span');
-    author.textContent = review.user?.username ? `By ${review.user.username}` : 'Anonymous traveler';
-
-    const location = document.createElement('span');
-    location.textContent = review.place?.city
-      ? `${review.place.city}, ${review.place.country || ''}`.trim()
-      : review.place?.name || 'Unmapped location';
-
-    const rating = document.createElement('span');
-    rating.className = 'rating';
-    rating.textContent = `★ ${review.rating ?? '—'}`;
-
-    const created = document.createElement('span');
-    created.textContent = formatDate(review.created_at);
-
-    meta.append(author, location, rating, created);
-
-    const content = document.createElement('p');
-    content.textContent = review.content || 'No description provided.';
-
-    item.append(title, meta, content);
-    fragment.appendChild(item);
-  });
-
-  reviewsList.appendChild(fragment);
-};
-
-const highlightOnMap = (review) => {
-  const place = review.place || {};
-  let mapUrl;
-  if (place.latitude && place.longitude) {
-    mapUrl = `https://maps.google.com/maps?q=${place.latitude},${place.longitude}&z=12&output=embed`;
-  } else if (place.city || place.name) {
-    const query = encodeURIComponent(`${place.name || ''} ${place.city || ''} ${place.country || ''}`.trim());
-    mapUrl = `https://maps.google.com/maps?q=${query}&z=10&output=embed`;
-  }
-
-  if (mapUrl) {
-    mapFrame.src = mapUrl;
-  }
-};
-
-const loadFeed = async (query = {}) => {
-  try {
-    setFeedback(feedFeedback, 'Loading adventures…');
-    const qs = buildQueryString(query);
-    const data = await fetchJson(`/reviews${qs}`);
-    renderReviews(data.reviews || []);
-    setFeedback(feedFeedback, data.reviews?.length ? '' : '');
-  } catch (error) {
-    console.error(error);
-    setFeedback(feedFeedback, error.message || 'Unable to load reviews', true);
-  }
-};
-
-const loadProfile = async () => {
-  if (!authToken) return;
-  try {
-    const [profile, stats] = await Promise.all([
-      fetchJson('/auth/profile', { method: 'GET' }, { requiresAuth: true }),
-      fetchJson('/auth/stats', { method: 'GET' }, { requiresAuth: true }),
-    ]);
-
-    currentUser = profile;
-    profileUsername.textContent = profile.username || 'Traveler';
-    profileEmail.textContent = profile.email || '—';
-    profileCreated.textContent = formatDate(profile.created_at);
-    profileReviewCount.textContent = stats.reviews_count ?? '0';
-
-    profileForm.username.value = profile.username || '';
-    profileForm.bio.value = profile.bio || '';
-  } catch (error) {
-    console.error(error);
-    setFeedback(profileFeedback, error.message || 'Failed to load profile', true);
-  }
 };
 
 const handleLogin = async (event) => {
@@ -396,17 +646,17 @@ const handleLogin = async (event) => {
   };
 
   try {
-    setFeedback(authFeedback, 'Signing you in…');
+    setFeedback(authFeedback, 'Connexion en cours…');
     const data = await fetchJson('/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
 
     saveAuthState(data.access_token, data.user);
-    setFeedback(authFeedback, 'Welcome back! Redirecting to your feed.');
+    setFeedback(authFeedback, 'Ravi de vous revoir ! Redirection vers votre fil.');
     loginForm.reset();
   } catch (error) {
-    setFeedback(authFeedback, error.message || 'Unable to log in', true);
+    setFeedback(authFeedback, error.message || 'Impossible de se connecter', true);
   }
 };
 
@@ -417,7 +667,7 @@ const handleRegister = async (event) => {
   const confirmPassword = formData.get('confirmPassword').trim();
 
   if (password !== confirmPassword) {
-    setFeedback(authFeedback, 'Passwords do not match. Please try again.', true);
+    setFeedback(authFeedback, 'Les mots de passe ne correspondent pas. Veuillez réessayer.', true);
     return;
   }
 
@@ -428,20 +678,20 @@ const handleRegister = async (event) => {
   };
 
   try {
-    setFeedback(authFeedback, 'Creating your account…');
+    setFeedback(authFeedback, 'Création de votre compte…');
     await fetchJson('/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
 
-    setFeedback(authFeedback, 'Account created! You can now log in.', false);
+    setFeedback(authFeedback, 'Compte créé ! Vous pouvez maintenant vous connecter.', false);
     registerForm.reset();
     tabs.forEach((tab) => tab.classList.remove('active'));
     tabs.find((tab) => tab.dataset.tab === 'login').classList.add('active');
     loginForm.classList.remove('hidden');
     registerForm.classList.add('hidden');
   } catch (error) {
-    setFeedback(authFeedback, error.message || 'Unable to register', true);
+    setFeedback(authFeedback, error.message || 'Impossible de créer un compte', true);
   }
 };
 
@@ -449,7 +699,7 @@ const handleSearch = (event) => {
   event.preventDefault();
   const term = new FormData(searchForm).get('search').trim();
   loadFeed(term ? { search: term } : {});
-  if (term) {
+  if (term && mapFrame) {
     const query = encodeURIComponent(term);
     mapFrame.src = `https://maps.google.com/maps?q=${query}&z=6&output=embed`;
   }
@@ -458,56 +708,144 @@ const handleSearch = (event) => {
 const handleReviewSubmit = async (event) => {
   event.preventDefault();
   if (!authToken) {
-    setFeedback(reviewFeedback, 'You need to be logged in to share a review.', true);
+    setFeedback(reviewFeedback, 'Vous devez être connecté pour partager un avis.', true);
     return;
   }
 
   const formData = new FormData(reviewForm);
   const payload = Object.fromEntries(formData.entries());
-  payload.rating = Number(payload.rating);
+  Object.keys(payload).forEach((key) => {
+    if (typeof payload[key] === 'string') {
+      payload[key] = payload[key].trim();
+    }
+  });
+
+  let placeId;
+  try {
+    placeId = await ensurePlaceId(payload);
+  } catch (error) {
+    setFeedback(reviewFeedback, error.message || 'Impossible de déterminer le lieu.', true);
+    return;
+  }
+
+  const rating = Number(payload.rating);
+  if (Number.isNaN(rating) || rating < 1 || rating > 5) {
+    setFeedback(reviewFeedback, 'Merci de sélectionner une note entre 1 et 5.', true);
+    return;
+  }
+
+  if (!payload.title) {
+    setFeedback(reviewFeedback, 'Le titre de votre avis est requis.', true);
+    return;
+  }
+
+  if (!payload.content || payload.content.length < 10) {
+    setFeedback(reviewFeedback, 'Votre avis doit contenir au moins 10 caractères.', true);
+    return;
+  }
+
+  payload.rating = rating;
+  payload.place_id = placeId;
+
   if (!payload.visit_date) {
     delete payload.visit_date;
   }
 
-  try {
-    setFeedback(reviewFeedback, 'Publishing your review…');
-    await fetchJson('/reviews', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { requiresAuth: true });
+  delete payload.place_name;
+  delete payload.place_city;
+  delete payload.place_country;
+  delete payload.place_description;
 
-    setFeedback(reviewFeedback, 'Review published successfully!');
+  try {
+    setFeedback(reviewFeedback, 'Publication de votre avis…');
+    const response = await fetchJson(
+      '/reviews',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      { requiresAuth: true }
+    );
+
+    const createdReview = response?.data?.review;
+    lastCreatedReviewId = createdReview?.id || lastCreatedReviewId;
+
+    setFeedback(reviewFeedback, 'Avis publié avec succès !');
     reviewForm.reset();
-    loadFeed();
+
+    if (photoForm?.review_id && lastCreatedReviewId) {
+      photoForm.review_id.value = lastCreatedReviewId;
+    }
+
+    await loadFeed();
+    await loadProfile();
   } catch (error) {
-    setFeedback(reviewFeedback, error.message || 'Unable to publish review', true);
+    setFeedback(reviewFeedback, error.message || 'Impossible de publier cet avis', true);
   }
 };
 
 const handlePhotoSubmit = async (event) => {
   event.preventDefault();
   if (!authToken) {
-    setFeedback(photoFeedback, 'Please log in to upload a photo.', true);
+    setFeedback(photoFeedback, 'Veuillez vous connecter pour ajouter une photo.', true);
     return;
   }
 
   const formData = new FormData(photoForm);
-  const payload = Object.fromEntries(formData.entries());
-  Object.keys(payload).forEach((key) => {
-    if (payload[key] === '') delete payload[key];
-  });
+  const file = formData.get('photo_file');
+
+  if (!(file instanceof File) || !file.name) {
+    setFeedback(photoFeedback, 'Sélectionnez un fichier image à téléverser.', true);
+    return;
+  }
+
+  const caption = formData.get('caption');
+  if (typeof caption === 'string' && !caption.trim()) {
+    formData.delete('caption');
+  }
+
+  let reviewId = formData.get('review_id');
+  if (typeof reviewId === 'string') {
+    reviewId = reviewId.trim();
+  }
+
+  if (!reviewId && lastCreatedReviewId) {
+    formData.set('review_id', lastCreatedReviewId);
+  } else if (!reviewId) {
+    formData.delete('review_id');
+  } else {
+    formData.set('review_id', reviewId);
+  }
 
   try {
-    setFeedback(photoFeedback, 'Saving photo metadata…');
-    await fetchJson('/photos', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }, { requiresAuth: true });
+    setFeedback(photoFeedback, 'Téléversement de la photo en cours…');
+    const response = await fetchJson(
+      '/photos',
+      {
+        method: 'POST',
+        body: formData,
+      },
+      { requiresAuth: true }
+    );
 
-    setFeedback(photoFeedback, 'Photo saved! Attach the actual image through the backend upload workflow.');
+    const uploadedPhoto = response?.data;
+    const targetReviewId = uploadedPhoto?.review_id || formData.get('review_id');
+    if (targetReviewId) {
+      lastCreatedReviewId = targetReviewId;
+    }
+
+    const photoUrl = uploadedPhoto?.file_url;
+    setFeedback(
+      photoFeedback,
+      photoUrl ? `Photo téléversée avec succès ! (${photoUrl})` : 'Photo téléversée avec succès !'
+    );
     photoForm.reset();
+    if (targetReviewId && photoForm.review_id) {
+      photoForm.review_id.value = targetReviewId;
+    }
+    await loadFeed();
   } catch (error) {
-    setFeedback(photoFeedback, error.message || 'Unable to save photo', true);
+    setFeedback(photoFeedback, error.message || "Impossible d'enregistrer la photo", true);
   }
 };
 
@@ -517,16 +855,16 @@ const handleProfileUpdate = async (event) => {
   const payload = Object.fromEntries(formData.entries());
 
   try {
-    setFeedback(profileFeedback, 'Updating profile…');
+    setFeedback(profileFeedback, 'Mise à jour du profil…');
     const result = await fetchJson('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }, { requiresAuth: true });
 
-    setFeedback(profileFeedback, result.message || 'Profile updated!');
+    setFeedback(profileFeedback, result.message || 'Profil mis à jour !');
     await loadProfile();
   } catch (error) {
-    setFeedback(profileFeedback, error.message || 'Unable to update profile', true);
+    setFeedback(profileFeedback, error.message || 'Impossible de mettre le profil à jour', true);
   }
 };
 
@@ -536,41 +874,41 @@ const handlePasswordChange = async (event) => {
   const payload = Object.fromEntries(formData.entries());
 
   try {
-    setFeedback(profileFeedback, 'Updating password…');
+    setFeedback(profileFeedback, 'Mise à jour du mot de passe…');
     const result = await fetchJson('/auth/change-password', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }, { requiresAuth: true });
 
-    setFeedback(profileFeedback, result.message || 'Password updated successfully.');
+    setFeedback(profileFeedback, result.message || 'Mot de passe mis à jour.');
     passwordForm.reset();
   } catch (error) {
-    setFeedback(profileFeedback, error.message || 'Unable to update password', true);
+    setFeedback(profileFeedback, error.message || 'Impossible de mettre à jour le mot de passe', true);
   }
 };
 
 const handleDeactivate = async (event) => {
   event.preventDefault();
-  if (!confirm('Are you sure you want to deactivate your NAYA account?')) {
+  if (!confirm('Voulez-vous vraiment désactiver votre compte NAYA ?')) {
     return;
   }
 
   try {
-    setFeedback(profileFeedback, 'Deactivating account…');
+    setFeedback(profileFeedback, 'Désactivation du compte…');
     const result = await fetchJson('/auth/deactivate', {
       method: 'PUT',
     }, { requiresAuth: true });
 
-    setFeedback(profileFeedback, result.message || 'Account deactivated.');
+    setFeedback(profileFeedback, result.message || 'Compte désactivé.');
     saveAuthState(null, null);
   } catch (error) {
-    setFeedback(profileFeedback, error.message || 'Unable to deactivate account', true);
+    setFeedback(profileFeedback, error.message || 'Impossible de désactiver le compte', true);
   }
 };
 
 const handleLogout = () => {
   saveAuthState(null, null);
-  setFeedback(authFeedback, 'You have been logged out. See you soon!');
+  setFeedback(authFeedback, 'Vous êtes déconnecté. À très vite !');
 };
 
 const initTabs = () => {
@@ -598,7 +936,8 @@ const initNavigation = () => {
       const target = button.dataset.target;
       showView(target);
       if (target === 'feed-view') {
-        loadFeed();
+        updateHeroStats(lastReviews);
+        renderMapFeed(lastReviews);
       }
       if (target === 'profile-view') {
         loadProfile();
@@ -627,7 +966,7 @@ const initApp = () => {
   updateApiIndicator();
   if (window.location.protocol === 'https:' && apiBaseUrl.startsWith('http://')) {
     showGlobalMessage(
-      'This page is served over HTTPS. Configure an HTTPS API URL via “API settings” to avoid blocked requests.',
+      'Cette page est servie en HTTPS. Configurez une URL d\'API en HTTPS via « Paramètres API » pour éviter les requêtes bloquées.',
       true,
       8000
     );
