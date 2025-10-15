@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NAYA Travel Journal</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <h1>NAYA</h1>
+        <p class="tagline">Travel journal for modern explorers</p>
+      </div>
+      <div class="header-controls">
+        <div class="api-controls">
+          <button id="api-config-btn" class="nav-btn nav-btn--ghost" type="button">
+            API settings
+          </button>
+          <span
+            id="api-indicator"
+            class="api-indicator"
+            role="status"
+            aria-live="polite"
+          ></span>
+        </div>
+        <nav class="main-nav" aria-label="Main navigation">
+          <button class="nav-btn" data-target="feed-view">Feed</button>
+          <button class="nav-btn" data-target="add-review-view">Add Review</button>
+          <button class="nav-btn" data-target="profile-view">Profile</button>
+          <button id="logout-btn" class="nav-btn nav-btn--secondary">Log out</button>
+        </nav>
+      </div>
+    </header>
+
+    <div
+      id="global-feedback"
+      class="feedback global-feedback hidden"
+      role="status"
+      aria-live="polite"
+    ></div>
+
+    <main>
+      <section id="auth-view" class="view">
+        <div class="auth-card">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="login" role="tab">Log in</button>
+            <button class="tab" data-tab="register" role="tab">Create account</button>
+          </div>
+
+          <form id="login-form" class="form" autocomplete="on">
+            <h2>Welcome back</h2>
+            <label>
+              Email
+              <input type="email" name="email" required />
+            </label>
+            <label>
+              Password
+              <input type="password" name="password" minlength="8" required />
+            </label>
+            <button type="submit" class="primary-btn">Log in</button>
+          </form>
+
+          <form id="register-form" class="form hidden" autocomplete="on">
+            <h2>Join the community</h2>
+            <div class="two-columns">
+              <label>
+                Username
+                <input type="text" name="username" minlength="3" required />
+              </label>
+              <label>
+                Email
+                <input type="email" name="email" required />
+              </label>
+            </div>
+            <label>
+              Password
+              <input type="password" name="password" minlength="8" required />
+            </label>
+            <label>
+              Confirm password
+              <input type="password" name="confirmPassword" minlength="8" required />
+            </label>
+            <p class="form-hint">
+              Your password must be at least 8 characters and include a mix of
+              letters and numbers.
+            </p>
+            <button type="submit" class="primary-btn">Create account</button>
+          </form>
+
+          <p id="auth-feedback" class="feedback" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section id="feed-view" class="view hidden" aria-label="Feed view">
+        <div class="view-header">
+          <div>
+            <h2>Traveler feed</h2>
+            <p class="subtitle">
+              Discover authentic activities shared by the NAYA community.
+            </p>
+          </div>
+          <form id="search-form" class="search" role="search">
+            <label class="sr-only" for="search-input">Search reviews</label>
+            <input
+              id="search-input"
+              type="search"
+              name="search"
+              placeholder="Search by keyword, city, or activity"
+            />
+            <button type="submit" class="secondary-btn">Search</button>
+          </form>
+        </div>
+
+        <div class="feed-content">
+          <aside class="map-panel" aria-label="Map">
+            <iframe
+              id="map-frame"
+              title="Highlighted location"
+              src="https://maps.google.com/maps?q=paris&t=&z=5&ie=UTF8&iwloc=&output=embed"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
+            <p class="map-hint">
+              Map results update when you select a review or search for a new
+              place.
+            </p>
+          </aside>
+
+          <section class="feed-panel" aria-live="polite">
+            <ul id="reviews-list" class="reviews"></ul>
+            <p id="feed-feedback" class="feedback" role="status"></p>
+          </section>
+        </div>
+      </section>
+
+      <section id="add-review-view" class="view hidden" aria-label="Add review">
+        <div class="view-header">
+          <div>
+            <h2>Share a new experience</h2>
+            <p class="subtitle">
+              Tell other travelers about the places that inspired you.
+            </p>
+          </div>
+        </div>
+
+        <form id="review-form" class="form card">
+          <div class="two-columns">
+            <label>
+              Title
+              <input type="text" name="title" minlength="3" required />
+            </label>
+            <label>
+              Rating
+              <select name="rating" required>
+                <option value="">Select</option>
+                <option value="1">1 - Needs improvement</option>
+                <option value="2">2 - Below expectations</option>
+                <option value="3">3 - Good</option>
+                <option value="4">4 - Great</option>
+                <option value="5">5 - Exceptional</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Place ID
+            <input
+              type="text"
+              name="place_id"
+              placeholder="Use an existing place identifier"
+              required
+            />
+          </label>
+
+          <label>
+            Review
+            <textarea
+              name="content"
+              rows="6"
+              minlength="10"
+              placeholder="Share tips, highlights, and recommendations"
+              required
+            ></textarea>
+          </label>
+
+          <label>
+            Visit date
+            <input type="date" name="visit_date" />
+          </label>
+
+          <button type="submit" class="primary-btn">Publish review</button>
+          <p id="review-feedback" class="feedback" role="status"></p>
+        </form>
+
+        <section class="card upload-card" aria-label="Photo uploads">
+          <h3>Add a photo (optional)</h3>
+          <p class="subtitle">
+            Attach a photo to one of your reviews to bring the story to life.
+          </p>
+          <form id="photo-form" class="form">
+            <div class="two-columns">
+              <label>
+                Filename
+                <input
+                  type="text"
+                  name="filename"
+                  placeholder="sunset_bali.jpg"
+                  required
+                />
+              </label>
+              <label>
+                Review ID
+                <input
+                  type="text"
+                  name="review_id"
+                  placeholder="Optional review identifier"
+                />
+              </label>
+            </div>
+            <label>
+              Caption
+              <input
+                type="text"
+                name="caption"
+                placeholder="Describe the moment"
+              />
+            </label>
+            <button type="submit" class="secondary-btn">Save photo</button>
+            <p id="photo-feedback" class="feedback" role="status"></p>
+          </form>
+        </section>
+      </section>
+
+      <section id="profile-view" class="view hidden" aria-label="Profile">
+        <div class="view-header">
+          <div>
+            <h2>Your profile</h2>
+            <p class="subtitle">
+              Manage your details and keep track of your contributions.
+            </p>
+          </div>
+        </div>
+
+        <section class="card profile-card">
+          <dl class="profile-details">
+            <div>
+              <dt>Username</dt>
+              <dd id="profile-username">—</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd id="profile-email">—</dd>
+            </div>
+            <div>
+              <dt>Member since</dt>
+              <dd id="profile-created">—</dd>
+            </div>
+            <div>
+              <dt>Total reviews</dt>
+              <dd id="profile-review-count">0</dd>
+            </div>
+          </dl>
+
+          <form id="profile-form" class="form">
+            <h3>Update profile</h3>
+            <div class="two-columns">
+              <label>
+                Username
+                <input type="text" name="username" minlength="3" required />
+              </label>
+              <label>
+                Bio
+                <textarea
+                  name="bio"
+                  rows="3"
+                  placeholder="Share a short description of your travel style"
+                ></textarea>
+              </label>
+            </div>
+            <button type="submit" class="secondary-btn">Save changes</button>
+          </form>
+
+          <form id="password-form" class="form">
+            <h3>Change password</h3>
+            <label>
+              Current password
+              <input type="password" name="old_password" required />
+            </label>
+            <label>
+              New password
+              <input type="password" name="new_password" minlength="8" required />
+            </label>
+            <button type="submit" class="secondary-btn">Update password</button>
+          </form>
+
+          <form id="deactivate-form" class="form danger-zone">
+            <h3>Deactivate account</h3>
+            <p class="subtitle">
+              This action disables your account. You can reactivate it later by
+              contacting the NAYA team.
+            </p>
+            <button type="submit" class="danger-btn">Deactivate</button>
+          </form>
+
+          <p id="profile-feedback" class="feedback" role="status"></p>
+        </section>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>© <span id="year"></span> NAYA. Crafted for explorers worldwide.</p>
+    </footer>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
