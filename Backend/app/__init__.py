@@ -24,7 +24,7 @@ def create_app(config_object='config.Config'):
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
-    CORS(app)
+    CORS(app, resources={r"/api/*": {"origins": "*"}})
     
     # Register API routes
     from app.api.v1 import api_v1
