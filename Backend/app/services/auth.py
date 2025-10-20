@@ -3,8 +3,10 @@
 Authentication Service for NAYA Travel Journal
 """
 
-from flask_jwt_extended import create_access_token, create_refresh_token
 from datetime import timedelta
+from flask import current_app
+from flask_jwt_extended import create_access_token, create_refresh_token
+
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 
@@ -48,6 +50,9 @@ class AuthService:
             raise ValueError("Invalid username format")
         
         # Save user
+        admin_emails = current_app.config.get('ADMIN_EMAILS', [])
+        if user.email and user.email.lower() in admin_emails:
+            user.is_admin = True
         created_user = self.user_repository.create(user)
         
         return {
@@ -85,15 +90,15 @@ class AuthService:
         if not user.is_active:
             raise ValueError("Account is deactivated")
         
-        # Create JWT tokens
+        # Create JWT tokens using configured expirations
         access_token = create_access_token(
             identity=user.id,
-            expires_delta=timedelta(days=7)
+            expires_delta=self._get_expiration('JWT_ACCESS_TOKEN_EXPIRES', timedelta(hours=1))
         )
         
         refresh_token = create_refresh_token(
             identity=user.id,
-            expires_delta=timedelta(days=30)
+            expires_delta=self._get_expiration('JWT_REFRESH_TOKEN_EXPIRES', timedelta(days=30))
         )
         
         return {
@@ -102,6 +107,11 @@ class AuthService:
             'refresh_token': refresh_token,
             'user': user.to_dict()
         }
+    
+    def _get_expiration(self, config_key, fallback):
+        """Return JWT expiration delta from config with a sensible fallback."""
+        value = current_app.config.get(config_key)
+        return value if value is not None else fallback
     
     def get_user_profile(self, user_id):
         """

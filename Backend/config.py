@@ -41,6 +41,11 @@ class Config:
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',')
     DEFAULT_PAGE_SIZE = 20
     MAX_PAGE_SIZE = 100
+    ADMIN_EMAILS = [email.strip().lower() for email in os.getenv('ADMIN_EMAILS', '').split(',') if email.strip()]
+    ADMIN_DEFAULT_EMAIL = os.getenv('ADMIN_DEFAULT_EMAIL', '').strip().lower()
+    if ADMIN_DEFAULT_EMAIL and ADMIN_DEFAULT_EMAIL not in ADMIN_EMAILS:
+        ADMIN_EMAILS.append(ADMIN_DEFAULT_EMAIL)
+    ADMIN_DEFAULT_PASSWORD = os.getenv('ADMIN_DEFAULT_PASSWORD', '')
 
 class DevelopmentConfig(Config):
     """Development environment configuration"""
@@ -99,10 +104,3 @@ def get_config():
     """Get configuration class based on environment"""
     env = os.getenv('FLASK_ENV', 'development').lower()
     return config.get(env, config['default'])
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-    
-    @staticmethod
-    def allowed_file(filename):
-        """Check if file extension is allowed"""
-        return '.' in filename and \
-               filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS

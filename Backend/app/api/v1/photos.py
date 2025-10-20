@@ -41,7 +41,8 @@ def get_photos():
             'success': False,
             'error': str(e)
         }), 400
-    except Exception as e:
+    except Exception:
+        current_app.logger.exception('Failed to list photos')
         return jsonify({
             'success': False,
             'error': 'Internal server error'
@@ -56,6 +57,8 @@ def create_photo():
         data = {}
         file_storage = None
 
+        current_app.logger.debug('create_photo request content-type=%s testing=%s', request.content_type, current_app.config.get('TESTING'))
+
         if request.content_type and 'multipart/form-data' in request.content_type.lower():
             data = request.form.to_dict()
             file_storage = (
@@ -68,7 +71,7 @@ def create_photo():
         else:
             data = request.get_json(silent=True) or {}
 
-        if not data:
+        if not data and file_storage is None:
             return jsonify({
                 'success': False,
                 'error': 'No data provided'
@@ -88,11 +91,12 @@ def create_photo():
             'success': False,
             'error': str(e)
         }), 400
-    except Exception as e:
+    except Exception:
+        current_app.logger.exception('Failed to create photo')
         return jsonify({
             'success': False,
-                'error': 'Internal server error'
-            }), 500
+            'error': 'Internal server error'
+        }), 500
 
 @photos_bp.route('/files/<path:filename>', methods=['GET'])
 def serve_photo_file(filename):

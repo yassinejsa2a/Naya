@@ -22,6 +22,7 @@ class User(BaseModel):
     # Account status
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
     
     # Relationships
     reviews = db.relationship('Review', backref='author', lazy=True, cascade='all, delete-orphan')
@@ -51,6 +52,8 @@ class User(BaseModel):
         user_dict = super().to_dict()
         # Remove sensitive information
         user_dict.pop('password_hash', None)
+        # Ensure boolean flags present
+        user_dict['is_admin'] = bool(user_dict.get('is_admin'))
         return user_dict
     
     def to_public_dict(self):

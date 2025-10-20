@@ -27,6 +27,11 @@ const photoFeedback = document.getElementById('photo-feedback');
 const profileFeedback = document.getElementById('profile-feedback');
 
 const reviewsList = document.getElementById('reviews-list');
+const reviewDetailPanel = document.getElementById('review-detail');
+const reviewDetailBody = document.getElementById('detail-content');
+const reviewDetailTitle = document.getElementById('detail-title');
+const reviewDetailMeta = document.getElementById('detail-meta');
+const closeDetailBtn = document.getElementById('close-detail-btn');
 const mapFrame = document.getElementById('map-frame');
 const mapFeedList = document.getElementById('map-feed-list');
 const heroReviewCount = document.getElementById('hero-review-count');
@@ -108,6 +113,7 @@ let lastReviews = [];
 let highlightedReviewId = null;
 let globalMessageTimeoutId;
 let lastCreatedReviewId = null;
+let currentDetailReviewId = null;
 
 const formatDate = (iso) => {
   if (!iso) return '—';
@@ -424,11 +430,15 @@ const renderMapFeed = (reviews = []) => {
 
     item.append(title, meta);
 
-    item.addEventListener('click', () => highlightOnMap(review));
+    item.addEventListener('click', () => {
+      highlightOnMap(review);
+      showReviewDetail(review.id);
+    });
     item.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         highlightOnMap(review);
+        showReviewDetail(review.id);
       }
     });
 
@@ -462,11 +472,15 @@ const renderReviews = (reviews = []) => {
     item.className = 'review-card';
     item.tabIndex = 0;
     item.dataset.reviewId = review.id;
-    item.addEventListener('click', () => highlightOnMap(review));
+    item.addEventListener('click', () => {
+      highlightOnMap(review);
+      showReviewDetail(review.id);
+    });
     item.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         highlightOnMap(review);
+        showReviewDetail(review.id);
       }
     });
 
@@ -542,6 +556,14 @@ const renderReviews = (reviews = []) => {
   updateHeroStats(reviews);
   renderMapFeed(reviews);
   highlightReviewItems();
+  if (currentDetailReviewId) {
+    const current = reviews.find((review) => String(review.id) === String(currentDetailReviewId));
+    if (current) {
+      renderReviewDetailContent(current);
+    } else {
+      hideReviewDetail();
+    }
+  }
 };
 
 const highlightOnMap = (review) => {
@@ -562,7 +584,166 @@ const highlightOnMap = (review) => {
   if (review?.id != null) {
     highlightedReviewId = review.id;
     highlightReviewItems();
+    currentDetailReviewId = review.id;
   }
+};
+
+const clearDetailPanel = () => {
+  if (!reviewDetailBody) return;
+  reviewDetailBody.innerHTML = '';
+};
+
+const hideReviewDetail = () => {
+  if (!reviewDetailPanel) return;
+  reviewDetailPanel.classList.add('hidden');
+  clearDetailPanel();
+  if (reviewDetailTitle) {
+    reviewDetailTitle.textContent = 'Sélectionnez un avis';
+  }
+  if (reviewDetailMeta) {
+    reviewDetailMeta.textContent = 'Explorez un avis pour afficher ses détails.';
+  }
+  currentDetailReviewId = null;
+  highlightedReviewId = null;
+  highlightReviewItems();
+};
+
+const buildRatingLabel = (rating) => {
+  if (typeof rating !== 'number' || Number.isNaN(rating)) return 'Note indisponible';
+  const stars = '★'.repeat(Math.round(rating));
+  return `${stars} (${rating}/5)`;
+};
+
+const renderReviewDetailContent = (review) => {
+  if (!reviewDetailPanel || !reviewDetailBody) return;
+  reviewDetailPanel.classList.remove('hidden');
+  clearDetailPanel();
+
+  if (photoForm?.review_id) {
+    photoForm.review_id.value = review.id || '';
+  }
+
+  const place = review.place || {};
+  const author = review.user?.username ? `Par ${review.user.username}` : 'Voyageur anonyme';
+  const visitDate = review.visit_date ? formatDate(review.visit_date) : null;
+  const createdAt = review.created_at ? formatDate(review.created_at) : null;
+
+  if (reviewDetailTitle) {
+    reviewDetailTitle.textContent = review.title || 'Avis sans titre';
+  }
+
+  if (reviewDetailMeta) {
+    const bits = [buildRatingLabel(review.rating), author];
+    if (visitDate) bits.push(`Visité le ${visitDate}`);
+    else if (createdAt) bits.push(`Publié le ${createdAt}`);
+    reviewDetailMeta.textContent = bits.filter(Boolean).join(' • ');
+  }
+
+  const hero = document.createElement('div');
+  hero.className = 'detail-hero';
+
+  const ratingBadge = document.createElement('span');
+  ratingBadge.className = 'rating';
+  ratingBadge.textContent = buildRatingLabel(review.rating);
+
+  const tagsContainer = document.createElement('div');
+  tagsContainer.className = 'detail-tags';
+
+  if (place.city || place.country) {
+    const tag = document.createElement('span');
+    tag.className = 'detail-tag';
+    tag.textContent = [place.city, place.country].filter(Boolean).join(', ');
+    tagsContainer.appendChild(tag);
+  }
+
+  if (place.name && (!place.city || place.name.toLowerCase() !== place.city.toLowerCase())) {
+    const tag = document.createElement('span');
+    tag.className = 'detail-tag';
+    tag.textContent = place.name;
+    tagsContainer.appendChild(tag);
+  }
+
+  if (visitDate) {
+    const tag = document.createElement('span');
+    tag.className = 'detail-tag';
+    tag.textContent = `Séjour : ${visitDate}`;
+    tagsContainer.appendChild(tag);
+  }
+
+  hero.append(ratingBadge, tagsContainer);
+
+  const contentBlock = document.createElement('p');
+  contentBlock.textContent = review.content || "Cet avis n'a pas encore de contenu détaillé.";
+
+  const placeBlock = document.createElement('div');
+  placeBlock.className = 'detail-place';
+  const placeTitle = document.createElement('strong');
+  placeTitle.textContent = place.name || 'Lieu non spécifié';
+  const placeLocation = document.createElement('span');
+  placeLocation.textContent = [place.city, place.country].filter(Boolean).join(', ') || 'Localisation inconnue';
+  placeBlock.append(placeTitle, placeLocation);
+  if (place.description) {
+    const placeDescription = document.createElement('p');
+    placeDescription.textContent = place.description;
+    placeBlock.appendChild(placeDescription);
+  }
+
+  reviewDetailBody.append(hero, contentBlock, placeBlock);
+
+  const photos = Array.isArray(review.photos) ? review.photos.filter((photo) => photo?.file_url) : [];
+  if (photos.length) {
+    const gallery = document.createElement('div');
+    gallery.className = 'detail-gallery';
+    photos.forEach((photo) => {
+      const figure = document.createElement('figure');
+      const img = document.createElement('img');
+      img.src = photo.file_url;
+      img.alt = photo.caption || `Photo de ${review.title || 'l\'avis'}`;
+      img.loading = 'lazy';
+      figure.appendChild(img);
+      if (photo.caption) {
+        const figcaption = document.createElement('figcaption');
+        figcaption.textContent = photo.caption;
+        figure.appendChild(figcaption);
+      }
+      gallery.appendChild(figure);
+    });
+    reviewDetailBody.appendChild(gallery);
+  } else {
+    const noPhotos = document.createElement('p');
+    noPhotos.className = 'detail-placeholder';
+    noPhotos.textContent = 'Aucune photo pour le moment. Ajoutez-en une via le formulaire ci-dessous.';
+    reviewDetailBody.appendChild(noPhotos);
+  }
+};
+
+const showReviewDetail = async (reviewId) => {
+  if (!reviewId || !reviewDetailPanel) return;
+
+  currentDetailReviewId = reviewId;
+  reviewDetailPanel.classList.remove('hidden');
+
+  if (reviewDetailTitle) {
+    reviewDetailTitle.textContent = 'Chargement de l’avis…';
+  }
+  if (reviewDetailMeta) {
+    reviewDetailMeta.textContent = 'Merci de patienter pendant que nous ouvrons les détails.';
+  }
+  clearDetailPanel();
+
+  let review = lastReviews.find((item) => String(item.id) === String(reviewId));
+  if (!review) {
+    try {
+      const response = await fetchJson(`/reviews/${reviewId}`);
+      review = response?.data || response;
+    } catch (error) {
+      setFeedback(feedFeedback, error.message || 'Impossible de charger le détail de cet avis', true);
+      hideReviewDetail();
+      return;
+    }
+  }
+
+  renderReviewDetailContent(review);
 };
 
 const loadFeed = async (query = {}) => {
@@ -578,6 +759,7 @@ const loadFeed = async (query = {}) => {
     setFeedback(feedFeedback, error.message || 'Impossible de charger les avis', true);
     updateHeroStats([]);
     renderMapFeed([]);
+    hideReviewDetail();
   }
 };
 
@@ -624,6 +806,7 @@ const updateLayoutForAuth = () => {
     loadProfile();
   } else {
     showView('auth-view');
+    hideReviewDetail();
   }
 };
 
@@ -641,7 +824,7 @@ const handleLogin = async (event) => {
   event.preventDefault();
   const formData = new FormData(loginForm);
   const payload = {
-    email: formData.get('email').trim(),
+    login: formData.get('login').trim(),
     password: formData.get('password').trim(),
   };
 
@@ -956,6 +1139,14 @@ const initEventListeners = () => {
   passwordForm.addEventListener('submit', handlePasswordChange);
   deactivateForm.addEventListener('submit', handleDeactivate);
   logoutBtn.addEventListener('click', handleLogout);
+  if (closeDetailBtn) {
+    closeDetailBtn.addEventListener('click', hideReviewDetail);
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      hideReviewDetail();
+    }
+  });
   if (apiConfigBtn) {
     apiConfigBtn.addEventListener('click', handleApiConfigClick);
   }

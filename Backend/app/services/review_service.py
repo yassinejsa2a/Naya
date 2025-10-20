@@ -169,9 +169,13 @@ class ReviewService:
         review = self.review_repository.get(review_id)
         if not review:
             raise ValueError("Review not found")
+
+        requester = self.user_repository.get(user_id)
+        if not requester:
+            raise ValueError("User not found")
         
-        # Check ownership
-        if review.user_id != user_id:
+        # Check ownership or admin privilege
+        if review.user_id != user_id and not requester.is_admin:
             raise ValueError("You can only update your own reviews")
         
         # Remove protected fields
@@ -236,9 +240,13 @@ class ReviewService:
         review = self.review_repository.get(review_id)
         if not review:
             raise ValueError("Review not found")
-        
-        # Check ownership
-        if review.user_id != user_id:
+
+        requester = self.user_repository.get(user_id)
+        if not requester:
+            raise ValueError("User not found")
+
+        # Check ownership or admin privilege
+        if review.user_id != user_id and not requester.is_admin:
             raise ValueError("You can only delete your own reviews")
         
         # Delete review

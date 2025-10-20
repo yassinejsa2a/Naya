@@ -71,11 +71,15 @@ def get_place(place_id):
     """Get specific place"""
     try:
         place = place_service.get_place_by_id(place_id)
+        if not place:
+            return jsonify({
+                'success': False,
+                'error': 'Place not found'
+            }), 404
         return jsonify({
             'success': True,
             'place': place
         }), 200
-        
     except ValueError as e:
         return jsonify({
             'success': False,
@@ -122,6 +126,11 @@ def delete_place(place_id):
     """Delete place"""
     try:
         result = place_service.delete_place(place_id)
+        if not result:
+            return jsonify({
+                'success': False,
+                'error': 'Place not found'
+            }), 404
         return jsonify({
             'success': True,
             'data': result

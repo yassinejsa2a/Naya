@@ -36,13 +36,13 @@ def login():
         if not data:
             return jsonify({"error": "No data provided"}), 400
         
-        email = data.get('email')
+        login_value = (data.get('email') or data.get('username') or data.get('login'))
         password = data.get('password')
         
-        if not email or not password:
-            return jsonify({"error": "Email and password are required"}), 400
+        if not login_value or not password:
+            return jsonify({"error": "Login (email or username) and password are required"}), 400
         
-        result = auth_service.authenticate_user(email, password)
+        result = auth_service.authenticate_user(login_value, password)
         return jsonify(result), 200
         
     except ValueError as e:

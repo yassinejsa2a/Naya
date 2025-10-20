@@ -3,6 +3,7 @@
 Place Repository for NAYA Travel Journal
 """
 
+import math
 from typing import List, Optional
 from app.models.place import Place
 from app.repositories.base_repository import SQLAlchemyRepository
@@ -100,7 +101,9 @@ class PlaceRepository(SQLAlchemyRepository):
         try:
             # Simple radius calculation (not precise for large distances)
             lat_range = radius_km / 111.0  # Rough km to degree conversion
-            lon_range = radius_km / (111.0 * abs(latitude))  # Adjust for latitude
+            cos_lat = math.cos(math.radians(latitude))
+            lon_divisor = 111.0 * max(abs(cos_lat), 0.01)  # Avoid division by zero near poles
+            lon_range = radius_km / lon_divisor
             
             query = Place.query.filter(
                 Place.latitude.between(latitude - lat_range, latitude + lat_range),

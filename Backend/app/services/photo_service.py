@@ -8,6 +8,7 @@ import uuid
 from typing import List, Optional, Dict, Any
 
 from flask import current_app, url_for
+from werkzeug.routing import BuildError
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
@@ -129,9 +130,13 @@ class PhotoService:
         photo = self.photo_repository.get(photo_id)
         if not photo:
             raise ValueError("Photo not found")
+
+        requester = self.user_repository.get(user_id)
+        if not requester:
+            raise ValueError("User not found")
         
         # Check ownership
-        if photo.user_id != user_id:
+        if photo.user_id != user_id and not requester.is_admin:
             raise PermissionError("You can only update your own photos")
         
         # Validate review exists if provided
@@ -170,9 +175,13 @@ class PhotoService:
         photo = self.photo_repository.get(photo_id)
         if not photo:
             return False
+
+        requester = self.user_repository.get(user_id)
+        if not requester:
+            raise ValueError("User not found")
         
         # Check ownership
-        if photo.user_id != user_id:
+        if photo.user_id != user_id and not requester.is_admin:
             raise PermissionError("You can only delete your own photos")
         
         removed = self.photo_repository.delete(photo_id)
@@ -274,7 +283,14 @@ class PhotoService:
             data['review'] = None
 
         try:
-            data['file_url'] = url_for('photos.serve_photo_file', filename=photo.filename, _external=True)
+            data['file_url'] = url_for('v1.photos.serve_photo_file', filename=photo.filename, _external=True)
+        except BuildError:
+            try:
+                data['file_url'] = url_for('photos.serve_photo_file', filename=photo.filename, _external=True)
+            except RuntimeError:
+                data['file_url'] = None
+            except BuildError:
+                data['file_url'] = None
         except RuntimeError:
             data['file_url'] = None
         data['caption'] = data.get('description')
