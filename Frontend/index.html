@@ -3,43 +3,61 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Journal de voyage NAYA</title>
-    <link rel="stylesheet" href="styles.css" />
+    <meta name="theme-color" content="#0f62ff" />
+    <title>NAYA • Carnet de voyage moderne</title>
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap"
       rel="stylesheet"
     />
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="app-header">
+    <a class="skip-link" href="#main-content">Aller au contenu principal</a>
+    <div class="app-background" aria-hidden="true"></div>
+
+    <!-- Header / Navigation -->
+    <header class="app-header" data-animate>
       <div class="brand">
-        <h1>NAYA</h1>
-        <p class="tagline">Carnet de voyage pour explorateurs modernes</p>
+        <div class="brand__logo">NAYA</div>
+        <p class="brand__tagline">Carnet de voyage pour explorateurs modernes</p>
       </div>
+
       <div class="header-controls">
-        <div class="api-controls">
-          <button id="api-config-btn" class="nav-btn nav-btn--ghost" type="button">
-            Paramètres API
-          </button>
-          <span
-            id="api-indicator"
-            class="api-indicator"
-            role="status"
-            aria-live="polite"
-          ></span>
-        </div>
         <nav class="main-nav" aria-label="Navigation principale">
           <button class="nav-btn" data-target="feed-view">Accueil</button>
-          <button class="nav-btn" data-target="add-review-view">Partager un avis</button>
-          <button class="nav-btn" data-target="map-view">Carte interactive</button>
+          <button class="nav-btn" data-target="add-review-view">Partager</button>
+          <button class="nav-btn" data-target="map-view">Carte</button>
           <button class="nav-btn" data-target="profile-view">Profil</button>
         </nav>
-        <button id="logout-btn" class="nav-btn nav-btn--secondary">Se déconnecter</button>
+
+        <div class="header-actions">
+          <div class="api-controls">
+            <button id="api-config-btn" class="nav-btn nav-btn--ghost" type="button">
+              Paramètres API
+            </button>
+            <span
+              id="api-indicator"
+              class="api-indicator"
+              role="status"
+              aria-live="polite"
+            ></span>
+          </div>
+
+          <button id="theme-toggle" class="icon-toggle" type="button" aria-pressed="false">
+            <span class="icon-toggle__icon" aria-hidden="true">🌙</span>
+            <span class="icon-toggle__label">Mode sombre</span>
+          </button>
+
+          <button id="logout-btn" class="nav-btn nav-btn--secondary">Se déconnecter</button>
+        </div>
       </div>
     </header>
 
+    <!-- Global feedback -->
     <div
       id="global-feedback"
       class="feedback global-feedback hidden"
@@ -47,8 +65,9 @@
       aria-live="polite"
     ></div>
 
-    <main>
-      <section id="auth-view" class="view">
+    <main id="main-content" class="app-main">
+      <!-- Auth view -->
+      <section id="auth-view" class="view" data-animate>
         <div class="auth-card">
           <div class="tabs" role="tablist">
             <button class="tab active" data-tab="login" role="tab">Connexion</button>
@@ -89,8 +108,7 @@
               <input type="password" name="confirmPassword" minlength="8" required />
             </label>
             <p class="form-hint">
-              Votre mot de passe doit contenir au moins 8 caractères et mêler
-              lettres et chiffres.
+              Votre mot de passe doit contenir au moins 8 caractères avec lettres et chiffres.
             </p>
             <button type="submit" class="primary-btn">Créer un compte</button>
           </form>
@@ -99,13 +117,12 @@
         </div>
       </section>
 
-      <section id="feed-view" class="view hidden" aria-label="Fil d'actualités">
-        <div class="view-header">
+      <!-- Feed view -->
+      <section id="feed-view" class="view hidden" aria-label="Fil d'actualités" data-animate>
+        <div class="view-header" data-animate>
           <div>
             <h2>Fil des voyageurs</h2>
-            <p class="subtitle">
-              Découvrez les expériences authentiques partagées par la communauté NAYA.
-            </p>
+            <p class="subtitle">Découvrez les expériences authentiques partagées par la communauté.</p>
           </div>
           <form id="search-form" class="search" role="search">
             <label class="sr-only" for="search-input">Rechercher un avis</label>
@@ -119,12 +136,12 @@
           </form>
         </div>
 
-        <section class="feed-hero" aria-label="Mise en avant NAYA">
+        <section class="feed-hero" aria-label="Mise en avant NAYA" data-animate>
           <div class="hero-content">
             <h3>Des carnets inspirants</h3>
             <p>
-              Parcourez les récits détaillés des membres et trouvez l'inspiration pour votre
-              prochaine échappée.
+              Parcourez les récits détaillés des membres et trouvez l'inspiration pour votre prochaine
+              échappée.
             </p>
           </div>
           <div class="hero-stats">
@@ -139,40 +156,42 @@
           </div>
         </section>
 
-        <section class="feed-panel" aria-live="polite">
-          <ul id="reviews-list" class="reviews"></ul>
-          <p id="feed-feedback" class="feedback" role="status"></p>
-        </section>
+        <section class="feed-layout" aria-live="polite">
+          <div class="feed-panel" data-animate>
+            <ul id="reviews-list" class="reviews"></ul>
+            <p id="feed-feedback" class="feedback" role="status"></p>
+          </div>
 
-        <aside id="review-detail" class="review-detail hidden" aria-live="polite">
-          <div class="review-detail__header">
-            <div>
-              <h3 id="detail-title">Sélectionnez un avis</h3>
-              <p id="detail-meta" class="detail-meta">Explorez un avis pour afficher ses détails.</p>
+          <aside id="review-detail" class="review-detail hidden" aria-live="polite" data-animate>
+            <div class="review-detail__header">
+              <div>
+                <h3 id="detail-title">Sélectionnez un avis</h3>
+                <p id="detail-meta" class="detail-meta">Explorez un avis pour afficher ses détails.</p>
+              </div>
+              <button id="close-detail-btn" type="button" class="icon-btn" aria-label="Fermer les détails">
+                ✕
+              </button>
             </div>
-            <button id="close-detail-btn" type="button" class="icon-btn" aria-label="Fermer les détails">
-              ✕
-            </button>
-          </div>
-          <div id="detail-content" class="review-detail__body">
-            <p class="detail-placeholder">
-              Cliquez sur un avis pour afficher sa description, sa note, ses photos et les informations du lieu.
-            </p>
-          </div>
-        </aside>
+            <div id="detail-content" class="review-detail__body">
+              <p class="detail-placeholder">
+                Cliquez sur un avis pour afficher sa description, sa note, ses photos et les informations du
+                lieu.
+              </p>
+            </div>
+          </aside>
+        </section>
       </section>
 
-      <section id="add-review-view" class="view hidden" aria-label="Ajouter un avis">
+      <!-- Add review view -->
+      <section id="add-review-view" class="view hidden" aria-label="Ajouter un avis" data-animate>
         <div class="view-header">
           <div>
             <h2>Partager une nouvelle expérience</h2>
-            <p class="subtitle">
-              Inspirez d'autres voyageurs avec les lieux qui vous ont marqué.
-            </p>
+            <p class="subtitle">Inspirez d'autres voyageurs avec les lieux qui vous ont marqué.</p>
           </div>
         </div>
 
-        <form id="review-form" class="form card">
+        <form id="review-form" class="form card" data-animate>
           <div class="two-columns">
             <label>
               Titre
@@ -238,8 +257,8 @@
           </label>
 
           <p class="form-hint">
-            Indiquez le nom, la ville et le pays pour créer un nouveau lieu, ou
-            renseignez uniquement l'identifiant d'un lieu existant.
+            Indiquez le nom, la ville et le pays pour créer un nouveau lieu, ou renseignez uniquement
+            l'identifiant d'un lieu existant.
           </p>
 
           <label>
@@ -262,7 +281,7 @@
           <p id="review-feedback" class="feedback" role="status"></p>
         </form>
 
-        <section class="card upload-card" aria-label="Ajouter une photo">
+        <section class="card upload-card" aria-label="Ajouter une photo" data-animate>
           <h3>Ajouter une photo (optionnel)</h3>
           <p class="subtitle">
             Joignez une photo à l'un de vos avis pour faire voyager la communauté.
@@ -301,17 +320,16 @@
         </section>
       </section>
 
-      <section id="profile-view" class="view hidden" aria-label="Profil">
+      <!-- Profile view -->
+      <section id="profile-view" class="view hidden" aria-label="Profil" data-animate>
         <div class="view-header">
           <div>
             <h2>Votre profil</h2>
-            <p class="subtitle">
-              Gérez vos informations et suivez vos contributions.
-            </p>
+            <p class="subtitle">Gérez vos informations et suivez vos contributions.</p>
           </div>
         </div>
 
-        <section class="card profile-card">
+        <section class="card profile-card" data-animate>
           <dl class="profile-details">
             <div>
               <dt>Nom d'utilisateur</dt>
@@ -331,7 +349,7 @@
             </div>
           </dl>
 
-          <form id="profile-form" class="form">
+          <form id="profile-form" class="form" data-animate>
             <h3>Mettre à jour le profil</h3>
             <div class="two-columns">
               <label>
@@ -350,7 +368,7 @@
             <button type="submit" class="secondary-btn">Enregistrer les modifications</button>
           </form>
 
-          <form id="password-form" class="form">
+          <form id="password-form" class="form" data-animate>
             <h3>Modifier le mot de passe</h3>
             <label>
               Mot de passe actuel
@@ -363,10 +381,11 @@
             <button type="submit" class="secondary-btn">Mettre à jour</button>
           </form>
 
-          <form id="deactivate-form" class="form danger-zone">
+          <form id="deactivate-form" class="form danger-zone" data-animate>
             <h3>Désactiver le compte</h3>
             <p class="subtitle">
-              Cette action désactive votre compte. Vous pourrez le réactiver plus tard en contactant l'équipe NAYA.
+              Cette action désactive votre compte. Vous pourrez le réactiver plus tard en contactant l'équipe
+              NAYA.
             </p>
             <button type="submit" class="danger-btn">Désactiver</button>
           </form>
@@ -375,7 +394,8 @@
         </section>
       </section>
 
-      <section id="map-view" class="view hidden" aria-label="Carte interactive">
+      <!-- Map view -->
+      <section id="map-view" class="view hidden" aria-label="Carte interactive" data-animate>
         <div class="view-header">
           <div>
             <h2>Explorer la carte</h2>
@@ -385,7 +405,7 @@
           </div>
         </div>
 
-        <div class="map-layout">
+        <div class="map-layout" data-animate>
           <div class="map-wrapper" aria-label="Carte des expériences">
             <iframe
               id="map-frame"
@@ -409,10 +429,15 @@
       </section>
     </main>
 
-    <footer class="app-footer">
-      <p>© <span id="year"></span> NAYA. Créé pour les explorateurs du monde entier.</p>
+    <!-- Footer -->
+    <footer class="app-footer" data-animate>
+      <div>
+        <p>© <span id="year"></span> NAYA. Créé pour les explorateurs du monde entier.</p>
+        <p class="subtitle">Une application pensée pour la découverte, la confiance et l'inspiration.</p>
+      </div>
     </footer>
 
+    <!-- Scripts -->
     <script src="app.js" defer></script>
   </body>
 </html>

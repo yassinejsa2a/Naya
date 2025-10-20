@@ -1,4 +1,5 @@
 const views = Array.from(document.querySelectorAll('.view'));
+const mainNav = document.querySelector('.main-nav');
 const navButtons = Array.from(document.querySelectorAll('.nav-btn[data-target]'));
 const logoutBtn = document.getElementById('logout-btn');
 const apiConfigBtn = document.getElementById('api-config-btn');
@@ -43,6 +44,128 @@ const profileCreated = document.getElementById('profile-created');
 const profileReviewCount = document.getElementById('profile-review-count');
 
 const tabs = Array.from(document.querySelectorAll('.tab'));
+const themeToggle = document.getElementById('theme-toggle');
+const themeToggleIcon = themeToggle?.querySelector('.icon-toggle__icon') || null;
+const themeToggleLabel = themeToggle?.querySelector('.icon-toggle__label') || null;
+const animatedElements = Array.from(document.querySelectorAll('[data-animate]'));
+
+const THEME_STORAGE_KEY = 'naya-theme';
+let revealObserver = null;
+
+const getStoredTheme = () => {
+  try {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'dark' || stored === 'light') {
+      return stored;
+    }
+  } catch (error) {
+    console.warn('NAYA : impossible de lire le thème stocké.', error);
+  }
+  return null;
+};
+
+const applyTheme = (theme) => {
+  const resolvedTheme = theme === 'dark' ? 'dark' : 'light';
+  document.body.setAttribute('data-theme', resolvedTheme);
+  if (themeToggle) {
+    const isDark = resolvedTheme === 'dark';
+    themeToggle.setAttribute('aria-pressed', String(isDark));
+    if (themeToggleIcon) {
+      themeToggleIcon.textContent = isDark ? '☀️' : '🌙';
+    }
+    if (themeToggleLabel) {
+      themeToggleLabel.textContent = isDark ? 'Mode clair' : 'Mode sombre';
+    }
+  }
+};
+
+const setTheme = (theme, { persist = true } = {}) => {
+  applyTheme(theme);
+  if (!persist) {
+    try {
+      window.localStorage.removeItem(THEME_STORAGE_KEY);
+    } catch (error) {
+      console.warn('NAYA : impossible de nettoyer le thème stocké.', error);
+    }
+    return;
+  }
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme === 'dark' ? 'dark' : 'light');
+  } catch (error) {
+    console.warn('NAYA : impossible de stocker le thème.', error);
+  }
+};
+
+const getPreferredTheme = () => {
+  const stored = getStoredTheme();
+  if (stored) {
+    return stored;
+  }
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
+};
+
+const attachSystemThemeListener = () => {
+  if (!window.matchMedia) return;
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const listener = (event) => {
+    if (getStoredTheme()) {
+      return;
+    }
+    applyTheme(event.matches ? 'dark' : 'light');
+  };
+  if (typeof mediaQuery.addEventListener === 'function') {
+    mediaQuery.addEventListener('change', listener);
+  } else if (typeof mediaQuery.addListener === 'function') {
+    mediaQuery.addListener(listener);
+  }
+};
+
+const initTheme = () => {
+  const stored = getStoredTheme();
+  if (stored) {
+    setTheme(stored);
+  } else {
+    applyTheme(getPreferredTheme());
+  }
+  attachSystemThemeListener();
+};
+
+const observeAnimatedElement = (element) => {
+  if (!element) return;
+  if (!element.hasAttribute('data-animate')) {
+    element.setAttribute('data-animate', '');
+  }
+  if (revealObserver) {
+    revealObserver.observe(element);
+  } else {
+    element.classList.add('is-visible');
+  }
+};
+
+const initRevealAnimations = () => {
+  if (!animatedElements.length) {
+    return;
+  }
+  if ('IntersectionObserver' in window) {
+    revealObserver = new IntersectionObserver(
+      (entries, observer) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -10% 0px' }
+    );
+    animatedElements.forEach((element) => revealObserver.observe(element));
+  } else {
+    animatedElements.forEach((element) => element.classList.add('is-visible'));
+  }
+};
 
 const normaliseApiBaseUrl = (value) => {
   if (!value) {
@@ -391,7 +514,7 @@ const highlightReviewItems = () => {
   }
 
   if (mapFeedList) {
-    const items = mapFeedList.querySelectorAll('li');
+    const items = mapFeedList.querySelectorAll('.map-feed-entry');
     items.forEach((item) => {
       const isActive = id && item.dataset.reviewId === id;
       item.classList.toggle('active', Boolean(isActive));
@@ -412,10 +535,13 @@ const renderMapFeed = (reviews = []) => {
     return;
   }
 
+  const itemsToAnimate = [];
+
   reviews.forEach((review) => {
     const item = document.createElement('li');
     item.tabIndex = 0;
     item.dataset.reviewId = review.id;
+    item.classList.add('map-feed-entry');
 
     const title = document.createElement('span');
     title.className = 'map-feed-title';
@@ -443,6 +569,11 @@ const renderMapFeed = (reviews = []) => {
     });
 
     mapFeedList.appendChild(item);
+    itemsToAnimate.push(item);
+  });
+
+  requestAnimationFrame(() => {
+    itemsToAnimate.forEach((item) => observeAnimatedElement(item));
   });
 
   highlightReviewItems();
@@ -466,6 +597,8 @@ const renderReviews = (reviews = []) => {
   if (highlightedReviewId != null && !ids.includes(String(highlightedReviewId))) {
     highlightedReviewId = null;
   }
+
+  const itemsToAnimate = [];
 
   reviews.forEach((review) => {
     const item = document.createElement('li');
@@ -531,7 +664,7 @@ const renderReviews = (reviews = []) => {
 
         const img = document.createElement('img');
         img.src = photo.file_url;
-        img.alt = photo.caption || `Photo de ${review.title || 'l\'avis'}`;
+        img.alt = photo.caption || `Photo de ${review.title || "l'avis"}`;
         img.loading = 'lazy';
         figure.appendChild(img);
 
@@ -550,9 +683,13 @@ const renderReviews = (reviews = []) => {
     }
 
     fragment.appendChild(item);
+    itemsToAnimate.push(item);
   });
 
   reviewsList.appendChild(fragment);
+  requestAnimationFrame(() => {
+    itemsToAnimate.forEach((item) => observeAnimatedElement(item));
+  });
   updateHeroStats(reviews);
   renderMapFeed(reviews);
   highlightReviewItems();
@@ -698,7 +835,7 @@ const renderReviewDetailContent = (review) => {
       const figure = document.createElement('figure');
       const img = document.createElement('img');
       img.src = photo.file_url;
-      img.alt = photo.caption || `Photo de ${review.title || 'l\'avis'}`;
+      img.alt = photo.caption || `Photo de ${review.title || "l'avis"}`;
       img.loading = 'lazy';
       figure.appendChild(img);
       if (photo.caption) {
@@ -798,7 +935,9 @@ const saveAuthState = (token, user) => {
 
 const updateLayoutForAuth = () => {
   const isAuthenticated = Boolean(authToken);
-  document.querySelector('.main-nav').classList.toggle('hidden', !isAuthenticated);
+  if (mainNav) {
+    mainNav.classList.toggle('hidden', !isAuthenticated);
+  }
   logoutBtn.classList.toggle('hidden', !isAuthenticated);
   if (isAuthenticated) {
     showView('feed-view');
@@ -818,6 +957,12 @@ const showView = (viewId) => {
     const isActive = button.dataset.target === viewId;
     button.classList.toggle('active', isActive);
   });
+};
+
+const handleThemeToggle = () => {
+  const currentTheme = document.body.getAttribute('data-theme') || getPreferredTheme();
+  const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  setTheme(nextTheme);
 };
 
 const handleLogin = async (event) => {
@@ -1150,10 +1295,15 @@ const initEventListeners = () => {
   if (apiConfigBtn) {
     apiConfigBtn.addEventListener('click', handleApiConfigClick);
   }
+  if (themeToggle) {
+    themeToggle.addEventListener('click', handleThemeToggle);
+  }
 };
 
 const initApp = () => {
+  initTheme();
   yearEl.textContent = new Date().getFullYear();
+  initRevealAnimations();
   updateApiIndicator();
   if (window.location.protocol === 'https:' && apiBaseUrl.startsWith('http://')) {
     showGlobalMessage(
