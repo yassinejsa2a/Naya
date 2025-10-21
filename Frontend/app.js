@@ -52,14 +52,55 @@ const animatedElements = Array.from(document.querySelectorAll('[data-animate]'))
 const THEME_STORAGE_KEY = 'naya-theme';
 let revealObserver = null;
 
-const getStoredTheme = () => {
+let storageAvailable = true;
+if (typeof window === 'undefined') {
+  storageAvailable = false;
+} else {
   try {
-    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light') {
-      return stored;
-    }
+    const testKey = '__naya_storage_test__';
+    window.localStorage.setItem(testKey, testKey);
+    window.localStorage.removeItem(testKey);
   } catch (error) {
-    console.warn('NAYA : impossible de lire le thème stocké.', error);
+    storageAvailable = false;
+    console.warn('NAYA : stockage local indisponible.', error);
+  }
+}
+
+const safeStorageGet = (key) => {
+  if (!storageAvailable) return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch (error) {
+    storageAvailable = false;
+    console.warn('NAYA : lecture du stockage impossible.', error);
+    return null;
+  }
+};
+
+const safeStorageSet = (key, value) => {
+  if (!storageAvailable) return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    storageAvailable = false;
+    console.warn('NAYA : ecriture du stockage impossible.', error);
+  }
+};
+
+const safeStorageRemove = (key) => {
+  if (!storageAvailable) return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch (error) {
+    storageAvailable = false;
+    console.warn('NAYA : suppression du stockage impossible.', error);
+  }
+};
+
+const getStoredTheme = () => {
+  const stored = safeStorageGet(THEME_STORAGE_KEY);
+  if (stored === 'dark' || stored === 'light') {
+    return stored;
   }
   return null;
 };
@@ -82,18 +123,10 @@ const applyTheme = (theme) => {
 const setTheme = (theme, { persist = true } = {}) => {
   applyTheme(theme);
   if (!persist) {
-    try {
-      window.localStorage.removeItem(THEME_STORAGE_KEY);
-    } catch (error) {
-      console.warn('NAYA : impossible de nettoyer le thème stocké.', error);
-    }
+    safeStorageRemove(THEME_STORAGE_KEY);
     return;
   }
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme === 'dark' ? 'dark' : 'light');
-  } catch (error) {
-    console.warn('NAYA : impossible de stocker le thème.', error);
-  }
+  safeStorageSet(THEME_STORAGE_KEY, theme === 'dark' ? 'dark' : 'light');
 };
 
 const getPreferredTheme = () => {
@@ -177,11 +210,26 @@ const normaliseApiBaseUrl = (value) => {
     throw new Error("L'URL de base de l'API ne peut pas être vide.");
   }
 
-  if (!/^https?:\/\//i.test(candidate)) {
-    candidate = `https://${candidate}`;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(candidate);
+  if (!hasScheme) {
+    const lowered = candidate.toLowerCase();
+    const isLocalHost =
+      lowered.startsWith('localhost') ||
+      lowered.startsWith('127.') ||
+      lowered.startsWith('0.0.0.0') ||
+      lowered.startsWith('::1');
+    const pageProtocol = (typeof window !== 'undefined' && window.location?.protocol) || 'https:';
+    const defaultScheme = isLocalHost || pageProtocol === 'http:' ? 'http://' : 'https://';
+    candidate = `${defaultScheme}${candidate}`;
   }
 
-  const url = new URL(candidate);
+  let url;
+  try {
+    url = new URL(candidate);
+  } catch (error) {
+    throw new Error("L'URL de base de l'API n'est pas valide.");
+  }
+
   url.hash = '';
   url.search = '';
 
@@ -190,7 +238,8 @@ const normaliseApiBaseUrl = (value) => {
     path = '/api/v1';
   }
 
-  return `${url.origin}${path.replace(/\/$/, '')}`;
+  const normalisedPath = path.endsWith('/') ? path.slice(0, -1) : path;
+  return `${url.origin}${normalisedPath}`;
 };
 
 const detectDefaultApiBaseUrl = () => {
@@ -203,40 +252,62 @@ const detectDefaultApiBaseUrl = () => {
     }
   }
 
-  if (window.location.origin && window.location.origin.startsWith('http')) {
+  const { protocol, origin, hostname, port } = window.location || {};
+  const isHttpProtocol = protocol === 'http:' || protocol === 'https:';
+  const isLocalHost =
+    !hostname ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1';
+
+  if (isLocalHost) {
+    return 'http://127.0.0.1:5000/api/v1';
+  }
+
+  if (isHttpProtocol && (!port || port === '' || port === '80' || port === '443' || port === '5000')) {
     try {
-      return normaliseApiBaseUrl(window.location.origin);
+      return normaliseApiBaseUrl(origin);
     } catch (error) {
       console.warn("NAYA : impossible de déterminer l'URL de base de l'API depuis window.location.origin.", error);
     }
   }
 
-  return 'http://localhost:5000/api/v1';
+  if (isHttpProtocol) {
+    try {
+      return normaliseApiBaseUrl(`${hostname}:5000`);
+    } catch (error) {
+      console.warn("NAYA : tentative de détection de l'API sur le port 5000 échouée.", error);
+    }
+  }
+
+  return 'http://127.0.0.1:5000/api/v1';
 };
 
 const defaultApiBaseUrl = detectDefaultApiBaseUrl();
 
 let apiBaseUrl = defaultApiBaseUrl;
 
-try {
-  const storedBase = window.localStorage.getItem('naya-api-base');
-  if (storedBase) {
-    apiBaseUrl = normaliseApiBaseUrl(storedBase);
-    window.localStorage.setItem('naya-api-base', apiBaseUrl);
+const storedApiBase = safeStorageGet('naya-api-base');
+if (storedApiBase) {
+  try {
+    apiBaseUrl = normaliseApiBaseUrl(storedApiBase);
+    safeStorageSet('naya-api-base', apiBaseUrl);
+  } catch (error) {
+    console.warn("NAYA : URL de base API stockée invalide, retour à la valeur par défaut.", error);
+    safeStorageRemove('naya-api-base');
+    apiBaseUrl = defaultApiBaseUrl;
   }
-} catch (error) {
-  console.warn("NAYA : URL de base API stockée invalide, retour à la valeur par défaut.", error);
-  window.localStorage.removeItem('naya-api-base');
-  apiBaseUrl = defaultApiBaseUrl;
 }
 
-let authToken = window.localStorage.getItem('naya-token');
+let authToken = safeStorageGet('naya-token');
 let currentUser = null;
 let lastReviews = [];
 let highlightedReviewId = null;
 let globalMessageTimeoutId;
 let lastCreatedReviewId = null;
 let currentDetailReviewId = null;
+const placeIdCache = new Map();
 
 const formatDate = (iso) => {
   if (!iso) return '—';
@@ -289,10 +360,11 @@ const showGlobalMessage = (message, isError = false, duration = 6000) => {
 const setApiBaseUrl = (value, { persist = true } = {}) => {
   apiBaseUrl = value;
   if (persist) {
-    window.localStorage.setItem('naya-api-base', value);
+    safeStorageSet('naya-api-base', value);
   } else {
-    window.localStorage.removeItem('naya-api-base');
+    safeStorageRemove('naya-api-base');
   }
+  placeIdCache.clear();
   updateApiIndicator();
 };
 
@@ -349,6 +421,11 @@ const buildQueryString = (params = {}) => {
 
 const normaliseFieldValue = (value) => (typeof value === 'string' ? value.trim() : '');
 
+const buildPlaceCacheKey = (name, city, country) =>
+  [normaliseFieldValue(name).toLowerCase(), normaliseFieldValue(city).toLowerCase(), normaliseFieldValue(country).toLowerCase()].join(
+    '::'
+  );
+
 const findExistingPlaceId = async (name, city, country) => {
   const query = buildQueryString({
     search: name,
@@ -359,6 +436,11 @@ const findExistingPlaceId = async (name, city, country) => {
 
   if (!query) {
     return null;
+  }
+
+  const cacheKey = buildPlaceCacheKey(name, city, country);
+  if (placeIdCache.has(cacheKey)) {
+    return placeIdCache.get(cacheKey);
   }
 
   try {
@@ -375,7 +457,11 @@ const findExistingPlaceId = async (name, city, country) => {
       return placeName === targetName && placeCity === targetCity && placeCountry === targetCountry;
     });
 
-    return matchingPlace?.id ?? null;
+    const matchingId = matchingPlace?.id ?? null;
+    if (matchingId) {
+      placeIdCache.set(cacheKey, matchingId);
+    }
+    return matchingId;
   } catch (error) {
     console.warn('NAYA : impossible de rechercher un lieu existant.', error);
     return null;
@@ -397,6 +483,7 @@ const ensurePlaceId = async (payload) => {
     throw new Error('Renseignez le nom, la ville et le pays du lieu ou fournissez son identifiant.');
   }
 
+  const cacheKey = buildPlaceCacheKey(name, city, country);
   let existingId = await findExistingPlaceId(name, city, country);
   if (existingId) {
     return existingId;
@@ -419,11 +506,13 @@ const ensurePlaceId = async (payload) => {
 
     const createdPlace = response?.data;
     if (createdPlace?.id) {
+      placeIdCache.set(cacheKey, createdPlace.id);
       return createdPlace.id;
     }
 
     // Certains endpoints renvoient la place sous data.place
     if (createdPlace?.place?.id) {
+      placeIdCache.set(cacheKey, createdPlace.place.id);
       return createdPlace.place.id;
     }
   } catch (error) {
@@ -457,14 +546,22 @@ const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) 
     response = await fetch(url, { ...options, headers });
   } catch (networkError) {
     console.error("NAYA : erreur réseau lors de l'appel à l'API.", networkError);
-    showGlobalMessage(
-      `Impossible de joindre l'API à ${apiBaseUrl}. Vérifiez l'adresse dans « Paramètres API » ainsi que votre connexion.`,
-      true,
-      8000
-    );
-    throw new Error(
-      `Impossible de joindre l'API à ${apiBaseUrl}. Merci de vérifier votre connexion ou vos paramètres API.`
-    );
+    let friendlyMessage = `Impossible de joindre l'API à ${apiBaseUrl}. Vérifiez l'adresse dans « Paramètres API » ainsi que votre connexion.`;
+
+    try {
+      const apiUrl = new URL(apiBaseUrl);
+      const pageProtocol = window.location?.protocol;
+      const isMixedContent = pageProtocol === 'https:' && apiUrl.protocol === 'http:';
+      if (isMixedContent) {
+        friendlyMessage =
+          "Connexion bloquée : l'interface est servie en HTTPS alors que l'API répond en HTTP. Passez l'API en HTTPS ou ouvrez le frontend en HTTP.";
+      }
+    } catch (urlError) {
+      // Ignore parsing error and keep default message
+    }
+
+    showGlobalMessage(friendlyMessage, true, 8000);
+    throw new Error(friendlyMessage);
   }
   const data = await response.json().catch(() => ({}));
 
@@ -926,9 +1023,9 @@ const saveAuthState = (token, user) => {
   authToken = token;
   currentUser = user || null;
   if (token) {
-    window.localStorage.setItem('naya-token', token);
+    safeStorageSet('naya-token', token);
   } else {
-    window.localStorage.removeItem('naya-token');
+    safeStorageRemove('naya-token');
   }
   updateLayoutForAuth();
 };

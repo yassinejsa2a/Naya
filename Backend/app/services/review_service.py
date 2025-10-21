@@ -249,6 +249,9 @@ class ReviewService:
         if review.user_id != user_id and not requester.is_admin:
             raise ValueError("You can only delete your own reviews")
         
+        # Delete associated photos before removing the review itself
+        self.photo_service.delete_photos_for_review(review_id)
+
         # Delete review
         success = self.review_repository.delete(review_id)
         if not success:

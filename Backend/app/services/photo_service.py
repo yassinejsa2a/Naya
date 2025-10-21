@@ -63,11 +63,7 @@ class PhotoService:
             storage_path, relative_path = self._resolve_storage_paths(stored_filename)
             self._save_file(file_storage, storage_path)
         else:
-            stored_filename = secure_filename(photo_data.get('filename', '') or '')
-            original_name = secure_filename(photo_data.get('original_name', '') or stored_filename)
-            relative_path = photo_data.get('file_path')
-            if not all([stored_filename, original_name, relative_path]):
-                raise ValueError("A photo file must be provided")
+            raise ValueError("A photo file must be provided")
         
         description = (
             photo_data.get('description') or
@@ -86,6 +82,8 @@ class PhotoService:
             review_obj = self.review_repository.get(review_id)
             if not review_obj:
                 raise ValueError("Review not found")
+            if review_obj.user_id != user_id and not user.is_admin:
+                raise PermissionError("You can only add photos to your own reviews")
         
         # Create photo
         photo = Photo(
@@ -144,12 +142,14 @@ class PhotoService:
             review = self.review_repository.get(photo_data['review_id'])
             if not review:
                 raise ValueError("Review not found")
+            if review.user_id != user_id and not requester.is_admin:
+                raise PermissionError("You can only link photos to your own reviews")
         # Normalise keys
         if 'caption' in photo_data and 'description' not in photo_data:
             photo_data['description'] = photo_data['caption']
         
         # Update allowed fields
-        allowed_fields = ['description', 'review_id', 'file_path']
+        allowed_fields = ['description', 'review_id']
         update_dict = {k: v for k, v in photo_data.items() if k in allowed_fields}
         
         self.photo_repository.update(photo_id, update_dict)
@@ -159,6 +159,18 @@ class PhotoService:
             raise ValueError("Failed to update photo")
             
         return self._build_photo_response(updated_photo)
+
+    def delete_photos_for_review(self, review_id: str) -> int:
+        """Force delete every photo associated with a review."""
+        photos = self.photo_repository.get_by_review(review_id)
+        removed = 0
+        for photo in photos:
+            file_path = photo.file_path
+            if not self.photo_repository.delete(photo.id):
+                raise ValueError("Failed to delete associated photo")
+            self._delete_file(file_path)
+            removed += 1
+        return removed
     
     def delete_photo(self, photo_id: str, user_id: str) -> bool:
         """
