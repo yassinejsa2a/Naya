@@ -15,7 +15,6 @@ const mapView = document.getElementById('map-view');
 const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
 const reviewForm = document.getElementById('review-form');
-const photoForm = document.getElementById('photo-form');
 const searchForm = document.getElementById('search-form');
 const profileForm = document.getElementById('profile-form');
 const passwordForm = document.getElementById('password-form');
@@ -24,7 +23,6 @@ const deactivateForm = document.getElementById('deactivate-form');
 const authFeedback = document.getElementById('auth-feedback');
 const feedFeedback = document.getElementById('feed-feedback');
 const reviewFeedback = document.getElementById('review-feedback');
-const photoFeedback = document.getElementById('photo-feedback');
 const profileFeedback = document.getElementById('profile-feedback');
 
 const reviewsList = document.getElementById('reviews-list');
@@ -157,13 +155,8 @@ const attachSystemThemeListener = () => {
 };
 
 const initTheme = () => {
-  const stored = getStoredTheme();
-  if (stored) {
-    setTheme(stored);
-  } else {
-    applyTheme(getPreferredTheme());
-  }
-  attachSystemThemeListener();
+  applyTheme('dark');
+  safeStorageRemove(THEME_STORAGE_KEY);
 };
 
 const observeAnimatedElement = (element) => {
@@ -305,7 +298,6 @@ let currentUser = null;
 let lastReviews = [];
 let highlightedReviewId = null;
 let globalMessageTimeoutId;
-let lastCreatedReviewId = null;
 let currentDetailReviewId = null;
 const placeIdCache = new Map();
 
@@ -546,7 +538,7 @@ const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) 
     response = await fetch(url, { ...options, headers });
   } catch (networkError) {
     console.error("NAYA : erreur réseau lors de l'appel à l'API.", networkError);
-    let friendlyMessage = `Impossible de joindre l'API à ${apiBaseUrl}. Vérifiez l'adresse dans « Paramètres API » ainsi que votre connexion.`;
+    let friendlyMessage = `Impossible de joindre l'API à ${apiBaseUrl}. Vérifiez la connexion et la configuration du serveur.`;
 
     try {
       const apiUrl = new URL(apiBaseUrl);
@@ -853,10 +845,6 @@ const renderReviewDetailContent = (review) => {
   reviewDetailPanel.classList.remove('hidden');
   clearDetailPanel();
 
-  if (photoForm?.review_id) {
-    photoForm.review_id.value = review.id || '';
-  }
-
   const place = review.place || {};
   const author = review.user?.username ? `Par ${review.user.username}` : 'Voyageur anonyme';
   const visitDate = review.visit_date ? formatDate(review.visit_date) : null;
@@ -1138,10 +1126,19 @@ const handleReviewSubmit = async (event) => {
   }
 
   const formData = new FormData(reviewForm);
-  const payload = Object.fromEntries(formData.entries());
-  Object.keys(payload).forEach((key) => {
-    if (typeof payload[key] === 'string') {
-      payload[key] = payload[key].trim();
+  const photoFile = formData.get('photo_file');
+  const captionValue = formData.get('caption');
+  const photoCaption = typeof captionValue === 'string' ? captionValue.trim() : '';
+
+  const payload = {};
+  formData.forEach((value, key) => {
+    if (key === 'photo_file' || key === 'caption') {
+      return;
+    }
+    if (typeof value === 'string') {
+      payload[key] = value.trim();
+    } else {
+      payload[key] = value;
     }
   });
 
@@ -1193,84 +1190,60 @@ const handleReviewSubmit = async (event) => {
     );
 
     const createdReview = response?.data?.review;
-    lastCreatedReviewId = createdReview?.id || lastCreatedReviewId;
+    const createdReviewId = createdReview?.id || null;
 
-    setFeedback(reviewFeedback, 'Avis publié avec succès !');
-    reviewForm.reset();
+    let photoError = null;
+    const hasPhotoToUpload = photoFile instanceof File && Boolean(photoFile?.name);
 
-    if (photoForm?.review_id && lastCreatedReviewId) {
-      photoForm.review_id.value = lastCreatedReviewId;
+    if (hasPhotoToUpload && createdReviewId) {
+      const photoPayload = new FormData();
+      photoPayload.append('photo_file', photoFile, photoFile.name);
+      photoPayload.append('review_id', createdReviewId);
+      if (photoCaption) {
+        photoPayload.append('caption', photoCaption);
+      }
+
+      setFeedback(reviewFeedback, 'Avis publié. Téléversement de la photo…');
+      try {
+        await fetchJson(
+          '/photos',
+          {
+            method: 'POST',
+            body: photoPayload,
+          },
+          { requiresAuth: true }
+        );
+      } catch (uploadError) {
+        console.error(uploadError);
+        photoError = uploadError;
+      }
     }
+
+    reviewForm.reset();
 
     await loadFeed();
     await loadProfile();
+
+    if (hasPhotoToUpload && !createdReviewId) {
+      setFeedback(
+        reviewFeedback,
+        "Avis publié, mais impossible d'associer la photo à cet avis.",
+        true
+      );
+    } else if (photoError) {
+      const errorMessage = photoError?.message || 'erreur inconnue';
+      setFeedback(
+        reviewFeedback,
+        `Avis publié, mais échec du téléversement de la photo : ${errorMessage}`,
+        true
+      );
+    } else if (hasPhotoToUpload) {
+      setFeedback(reviewFeedback, 'Avis et photo publiés avec succès !');
+    } else {
+      setFeedback(reviewFeedback, 'Avis publié avec succès !');
+    }
   } catch (error) {
     setFeedback(reviewFeedback, error.message || 'Impossible de publier cet avis', true);
-  }
-};
-
-const handlePhotoSubmit = async (event) => {
-  event.preventDefault();
-  if (!authToken) {
-    setFeedback(photoFeedback, 'Veuillez vous connecter pour ajouter une photo.', true);
-    return;
-  }
-
-  const formData = new FormData(photoForm);
-  const file = formData.get('photo_file');
-
-  if (!(file instanceof File) || !file.name) {
-    setFeedback(photoFeedback, 'Sélectionnez un fichier image à téléverser.', true);
-    return;
-  }
-
-  const caption = formData.get('caption');
-  if (typeof caption === 'string' && !caption.trim()) {
-    formData.delete('caption');
-  }
-
-  let reviewId = formData.get('review_id');
-  if (typeof reviewId === 'string') {
-    reviewId = reviewId.trim();
-  }
-
-  if (!reviewId && lastCreatedReviewId) {
-    formData.set('review_id', lastCreatedReviewId);
-  } else if (!reviewId) {
-    formData.delete('review_id');
-  } else {
-    formData.set('review_id', reviewId);
-  }
-
-  try {
-    setFeedback(photoFeedback, 'Téléversement de la photo en cours…');
-    const response = await fetchJson(
-      '/photos',
-      {
-        method: 'POST',
-        body: formData,
-      },
-      { requiresAuth: true }
-    );
-
-    const uploadedPhoto = response?.data;
-    const targetReviewId = uploadedPhoto?.review_id || formData.get('review_id');
-    if (targetReviewId) {
-      lastCreatedReviewId = targetReviewId;
-    }
-
-    const photoUrl = uploadedPhoto?.file_url;
-    setFeedback(
-      photoFeedback,
-      photoUrl ? `Photo téléversée avec succès ! (${photoUrl})` : 'Photo téléversée avec succès !'
-    );
-    photoForm.reset();
-    if (targetReviewId && photoForm.review_id) {
-      photoForm.review_id.value = targetReviewId;
-    }
-    await loadFeed();
-  } catch (error) {
-    setFeedback(photoFeedback, error.message || "Impossible d'enregistrer la photo", true);
   }
 };
 
@@ -1376,7 +1349,6 @@ const initEventListeners = () => {
   registerForm.addEventListener('submit', handleRegister);
   searchForm.addEventListener('submit', handleSearch);
   reviewForm.addEventListener('submit', handleReviewSubmit);
-  photoForm.addEventListener('submit', handlePhotoSubmit);
   profileForm.addEventListener('submit', handleProfileUpdate);
   passwordForm.addEventListener('submit', handlePasswordChange);
   deactivateForm.addEventListener('submit', handleDeactivate);
@@ -1404,7 +1376,7 @@ const initApp = () => {
   updateApiIndicator();
   if (window.location.protocol === 'https:' && apiBaseUrl.startsWith('http://')) {
     showGlobalMessage(
-      'Cette page est servie en HTTPS. Configurez une URL d\'API en HTTPS via « Paramètres API » pour éviter les requêtes bloquées.',
+      "Cette page est servie en HTTPS. Assurez-vous que l'API répond en HTTPS pour éviter les requêtes bloquées.",
       true,
       8000
     );

@@ -696,6 +696,14 @@ dd {
   gap: 1rem;
 }
 
+.form-divider {
+  height: 1px;
+  width: 100%;
+  background: color-mix(in srgb, var(--color-border) 65%, transparent);
+  border-radius: 999px;
+  margin: 1.5rem 0;
+}
+
 label {
   display: grid;
   gap: 0.45rem;

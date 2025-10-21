@@ -35,23 +35,6 @@
         </nav>
 
         <div class="header-actions">
-          <div class="api-controls">
-            <button id="api-config-btn" class="nav-btn nav-btn--ghost" type="button">
-              Paramètres API
-            </button>
-            <span
-              id="api-indicator"
-              class="api-indicator"
-              role="status"
-              aria-live="polite"
-            ></span>
-          </div>
-
-          <button id="theme-toggle" class="icon-toggle" type="button" aria-pressed="false">
-            <span class="icon-toggle__icon" aria-hidden="true">🌙</span>
-            <span class="icon-toggle__label">Mode sombre</span>
-          </button>
-
           <button id="logout-btn" class="nav-btn nav-btn--secondary">Se déconnecter</button>
         </div>
       </div>
@@ -191,7 +174,7 @@
           </div>
         </div>
 
-        <form id="review-form" class="form card" data-animate>
+        <form id="review-form" class="form card" data-animate enctype="multipart/form-data">
           <div class="two-columns">
             <label>
               Titre
@@ -239,15 +222,6 @@
           </div>
 
           <label>
-            Identifiant du lieu (optionnel)
-            <input
-              type="text"
-              name="place_id"
-              placeholder="Utilisez un identifiant existant si vous le connaissez"
-            />
-          </label>
-
-          <label>
             Description du lieu (optionnel)
             <input
               type="text"
@@ -257,8 +231,7 @@
           </label>
 
           <p class="form-hint">
-            Indiquez le nom, la ville et le pays pour créer un nouveau lieu, ou renseignez uniquement
-            l'identifiant d'un lieu existant.
+            Indiquez le nom, la ville et le pays pour créer un nouveau lieu.
           </p>
 
           <label>
@@ -277,47 +250,32 @@
             <input type="date" name="visit_date" />
           </label>
 
-          <button type="submit" class="primary-btn">Publier l'avis</button>
-          <p id="review-feedback" class="feedback" role="status"></p>
-        </form>
+          <div class="form-divider" aria-hidden="true"></div>
 
-        <section class="card upload-card" aria-label="Ajouter une photo" data-animate>
           <h3>Ajouter une photo (optionnel)</h3>
           <p class="subtitle">
-            Joignez une photo à l'un de vos avis pour faire voyager la communauté.
+            Joignez une photo à votre récit pour faire voyager la communauté.
           </p>
-          <form id="photo-form" class="form" enctype="multipart/form-data">
-            <label>
-              Image
-              <input
-                type="file"
-                name="photo_file"
-                accept="image/*"
-                required
-              />
-            </label>
-            <div class="two-columns">
-              <label>
-                Légende (optionnel)
-                <input
-                  type="text"
-                  name="caption"
-                  placeholder="Décrivez le moment"
-                />
-              </label>
-              <label>
-                Identifiant de l'avis (optionnel)
-                <input
-                  type="text"
-                  name="review_id"
-                  placeholder="L'avis auquel lier la photo"
-                />
-              </label>
-            </div>
-            <button type="submit" class="secondary-btn">Téléverser la photo</button>
-            <p id="photo-feedback" class="feedback" role="status"></p>
-          </form>
-        </section>
+          <label>
+            Photo
+            <input
+              type="file"
+              name="photo_file"
+              accept="image/*"
+            />
+          </label>
+          <label>
+            Légende (optionnel)
+            <input
+              type="text"
+              name="caption"
+              placeholder="Décrivez le moment"
+            />
+          </label>
+
+          <button type="submit" class="primary-btn">Publier l'expérience</button>
+          <p id="review-feedback" class="feedback" role="status"></p>
+        </form>
       </section>
 
       <!-- Profile view -->
