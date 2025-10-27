@@ -20,6 +20,18 @@ const profileForm = document.getElementById('profile-form');
 const profilePhotoForm = document.getElementById('profile-photo-form');
 const passwordForm = document.getElementById('password-form');
 const deactivateForm = document.getElementById('deactivate-form');
+const publicProfileView = document.getElementById('public-profile-view');
+const publicProfileReviewsList = document.getElementById('public-profile-reviews');
+const publicProfileFeedback = document.getElementById('public-profile-feedback');
+const publicProfileAvatar = document.getElementById('public-profile-avatar');
+const publicProfileUsername = document.getElementById('public-profile-username');
+const publicProfileBio = document.getElementById('public-profile-bio');
+const publicProfileCreated = document.getElementById('public-profile-created');
+const publicProfileReviewsCount = document.getElementById('public-profile-reviews-count');
+const publicProfilePhotosCount = document.getElementById('public-profile-photos-count');
+const publicProfileBackBtn = document.getElementById('public-profile-back');
+const publicProfileTitle = document.getElementById('public-profile-title');
+const publicProfileSubtitle = document.getElementById('public-profile-subtitle');
 
 const authFeedback = document.getElementById('auth-feedback');
 const feedFeedback = document.getElementById('feed-feedback');
@@ -317,6 +329,8 @@ let globalMessageTimeoutId;
 let currentDetailReviewId = null;
 let lastCreatedReviewId = null;
 let activeEditReviewId = null;
+let publicProfileUserId = null;
+let publicProfileReviews = [];
 const placeIdCache = new Map();
 
 const formatDate = (iso) => {
@@ -425,6 +439,34 @@ const setProfileAvatar = (url, username = '') => {
     profileAvatar.src = finalUrl;
   }
   profileAvatar.alt = username ? `Photo de profil de ${username}` : 'Photo de profil';
+};
+
+const attachUserProfileHandler = (element, user) => {
+  if (!element || !user?.id) return;
+  element.dataset.userId = user.id;
+  element.classList.add('is-link');
+  element.setAttribute('role', 'button');
+  if (!element.hasAttribute('tabindex')) {
+    element.tabIndex = 0;
+  }
+  const labelName = user.username || 'ce voyageur';
+  element.setAttribute('aria-label', `Afficher le profil de ${labelName}`);
+  const handler = (event) => {
+    event.stopPropagation();
+    if (currentUser?.id && String(currentUser.id) === String(user.id)) {
+      showView('profile-view');
+      loadProfile();
+      return;
+    }
+    showPublicProfile(user.id);
+  };
+  element.addEventListener('click', handler);
+  element.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handler(event);
+    }
+  });
 };
 
 const setMapFeedback = (message, isError = false) => {
@@ -667,6 +709,7 @@ const api = {
       fetchJson('/auth/avatar', { method: 'PUT', body: formData }, { requiresAuth: true }),
     deactivate: () => fetchJson('/auth/deactivate', { method: 'PUT' }, { requiresAuth: true }),
     stats: () => fetchJson('/auth/stats', { method: 'GET' }, { requiresAuth: true }),
+    publicProfile: (userId) => fetchJson(`/auth/users/${encodeURIComponent(userId)}`),
     refresh: () =>
       fetchJson(
         '/auth/refresh',
@@ -781,6 +824,7 @@ const renderMapFeed = (reviews = []) => {
 
     const authorBlock = document.createElement('div');
     authorBlock.className = 'map-feed-author';
+    authorBlock.tabIndex = 0;
 
     const authorAvatar = document.createElement('img');
     authorAvatar.className = 'map-feed-avatar';
@@ -793,6 +837,7 @@ const renderMapFeed = (reviews = []) => {
     authorName.textContent = review.user?.username || 'Voyageur anonyme';
 
     authorBlock.append(authorAvatar, authorName);
+    attachUserProfileHandler(authorBlock, review.user);
 
     const title = document.createElement('span');
     title.className = 'map-feed-title';
@@ -829,6 +874,137 @@ const renderMapFeed = (reviews = []) => {
   highlightReviewItems();
 };
 
+const createReviewCard = (review, { interactive = true } = {}) => {
+  const item = document.createElement('li');
+  item.className = 'review-card';
+  item.dataset.reviewId = review.id;
+
+  if (interactive) {
+    item.tabIndex = 0;
+    item.addEventListener('click', () => {
+      highlightOnMap(review);
+      showReviewDetail(review.id);
+    });
+    item.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        highlightOnMap(review);
+        showReviewDetail(review.id);
+      }
+    });
+  } else {
+    item.tabIndex = -1;
+    item.classList.add('review-card--static');
+  }
+
+  const header = document.createElement('div');
+  header.className = 'review-card__header';
+
+  const authorBlock = document.createElement('div');
+  authorBlock.className = 'review-author';
+  authorBlock.tabIndex = 0;
+
+  const authorAvatar = document.createElement('img');
+  authorAvatar.className = 'review-author__avatar';
+  authorAvatar.src = resolveAvatarUrl(review.user?.profile_photo_url);
+  authorAvatar.alt = review.user?.username
+    ? `Avatar de ${review.user.username}`
+    : 'Avatar voyageur';
+  authorAvatar.loading = 'lazy';
+
+  const authorInfo = document.createElement('div');
+  authorInfo.className = 'review-author__info';
+
+  const authorLabel = document.createElement('span');
+  authorLabel.className = 'review-author__label';
+  authorLabel.textContent = 'Publié par';
+
+  const authorName = document.createElement('span');
+  authorName.className = 'review-author__name';
+  authorName.textContent = review.user?.username || 'Voyageur anonyme';
+
+  const authorDate = document.createElement('span');
+  authorDate.className = 'review-author__meta';
+  const createdLabel = review.created_at ? formatDate(review.created_at) : null;
+  authorDate.textContent = createdLabel ? `Publié le ${createdLabel}` : 'Publication en attente';
+
+  authorInfo.append(authorLabel, authorName, authorDate);
+  authorBlock.append(authorAvatar, authorInfo);
+  attachUserProfileHandler(authorBlock, review.user);
+
+  const title = document.createElement('h3');
+  title.textContent = review.title || 'Expérience sans titre';
+
+  header.append(authorBlock, title);
+
+  const meta = document.createElement('div');
+  meta.className = 'review-meta';
+
+  const location = document.createElement('span');
+  location.textContent = review.place?.city
+    ? `${review.place.city}, ${review.place.country || ''}`.trim()
+    : review.place?.name || 'Lieu non cartographié';
+
+  const rating = document.createElement('span');
+  rating.className = 'rating';
+  rating.textContent = `★ ${review.rating ?? '—'}`;
+
+  meta.append(location, rating);
+
+  if (review.visit_date) {
+    const visitDate = document.createElement('span');
+    visitDate.textContent = `Visité le ${formatDate(review.visit_date)}`;
+    meta.append(visitDate);
+  }
+
+  const content = document.createElement('p');
+  content.textContent = review.content || 'Aucune description fournie.';
+
+  item.append(header, meta, content);
+
+  if (Array.isArray(review.photos) && review.photos.length) {
+    const gallery = document.createElement('div');
+    gallery.className = 'review-gallery';
+
+    review.photos.forEach((photo) => {
+      if (!photo?.file_url) return;
+
+      const figure = document.createElement('figure');
+      figure.className = 'review-photo';
+
+      const img = document.createElement('img');
+      img.src = photo.file_url;
+      img.alt = photo.caption || `Photo de ${review.title || "l'avis"}`;
+      img.loading = 'lazy';
+      figure.appendChild(img);
+
+      const captionBlock = document.createElement('figcaption');
+      if (photo.caption) {
+        const caption = document.createElement('span');
+        caption.textContent = photo.caption;
+        captionBlock.appendChild(caption);
+      }
+      if (photo.user?.username) {
+        const owner = document.createElement('span');
+        owner.className = 'photo-owner';
+        owner.textContent = `Partagée par ${photo.user.username}`;
+        captionBlock.appendChild(owner);
+      }
+      if (captionBlock.childNodes.length) {
+        figure.appendChild(captionBlock);
+      }
+
+      gallery.appendChild(figure);
+    });
+
+    if (gallery.children.length) {
+      item.appendChild(gallery);
+    }
+  }
+
+  return item;
+};
+
 const renderReviews = (reviews = []) => {
   reviewsList.innerHTML = '';
 
@@ -851,126 +1027,7 @@ const renderReviews = (reviews = []) => {
   const itemsToAnimate = [];
 
   reviews.forEach((review) => {
-    const item = document.createElement('li');
-    item.className = 'review-card';
-    item.tabIndex = 0;
-    item.dataset.reviewId = review.id;
-    item.addEventListener('click', () => {
-      highlightOnMap(review);
-      showReviewDetail(review.id);
-    });
-    item.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        highlightOnMap(review);
-        showReviewDetail(review.id);
-      }
-    });
-
-    const header = document.createElement('div');
-    header.className = 'review-card__header';
-
-    const authorBlock = document.createElement('div');
-    authorBlock.className = 'review-author';
-
-    const authorAvatar = document.createElement('img');
-    authorAvatar.className = 'review-author__avatar';
-    authorAvatar.src = resolveAvatarUrl(review.user?.profile_photo_url);
-    authorAvatar.alt = review.user?.username
-      ? `Avatar de ${review.user.username}`
-      : 'Avatar voyageur';
-    authorAvatar.loading = 'lazy';
-
-    const authorInfo = document.createElement('div');
-    authorInfo.className = 'review-author__info';
-
-    const authorLabel = document.createElement('span');
-    authorLabel.className = 'review-author__label';
-    authorLabel.textContent = 'Publié par';
-
-    const authorName = document.createElement('span');
-    authorName.className = 'review-author__name';
-    authorName.textContent = review.user?.username || 'Voyageur anonyme';
-
-    const authorDate = document.createElement('span');
-    authorDate.className = 'review-author__meta';
-    const createdLabel = review.created_at ? formatDate(review.created_at) : null;
-    authorDate.textContent = createdLabel ? `Publié le ${createdLabel}` : 'Publication en attente';
-
-    authorInfo.append(authorLabel, authorName, authorDate);
-    authorBlock.append(authorAvatar, authorInfo);
-
-    const title = document.createElement('h3');
-    title.textContent = review.title || 'Expérience sans titre';
-
-    header.append(authorBlock, title);
-
-    const meta = document.createElement('div');
-    meta.className = 'review-meta';
-
-    const location = document.createElement('span');
-    location.textContent = review.place?.city
-      ? `${review.place.city}, ${review.place.country || ''}`.trim()
-      : review.place?.name || 'Lieu non cartographié';
-
-    const rating = document.createElement('span');
-    rating.className = 'rating';
-    rating.textContent = `★ ${review.rating ?? '—'}`;
-
-    const metaChildren = [location, rating];
-    if (review.visit_date) {
-      const visitDate = document.createElement('span');
-      visitDate.textContent = `Visité le ${formatDate(review.visit_date)}`;
-      metaChildren.push(visitDate);
-    }
-
-    meta.append(...metaChildren);
-
-    const content = document.createElement('p');
-    content.textContent = review.content || 'Aucune description fournie.';
-
-    item.append(header, meta, content);
-
-    if (Array.isArray(review.photos) && review.photos.length) {
-      const gallery = document.createElement('div');
-      gallery.className = 'review-gallery';
-
-      review.photos.forEach((photo) => {
-        if (!photo?.file_url) return;
-
-        const figure = document.createElement('figure');
-        figure.className = 'review-photo';
-
-        const img = document.createElement('img');
-        img.src = photo.file_url;
-        img.alt = photo.caption || `Photo de ${review.title || "l'avis"}`;
-        img.loading = 'lazy';
-        figure.appendChild(img);
-
-        const captionBlock = document.createElement('figcaption');
-        if (photo.caption) {
-          const caption = document.createElement('span');
-          caption.textContent = photo.caption;
-          captionBlock.appendChild(caption);
-        }
-        if (photo.user?.username) {
-          const owner = document.createElement('span');
-          owner.className = 'photo-owner';
-          owner.textContent = `Partagée par ${photo.user.username}`;
-          captionBlock.appendChild(owner);
-        }
-        if (captionBlock.childNodes.length) {
-          figure.appendChild(captionBlock);
-        }
-
-        gallery.appendChild(figure);
-      });
-
-      if (gallery.children.length) {
-        item.appendChild(gallery);
-      }
-    }
-
+    const item = createReviewCard(review);
     fragment.appendChild(item);
     itemsToAnimate.push(item);
   });
@@ -990,6 +1047,24 @@ const renderReviews = (reviews = []) => {
       hideReviewDetail();
     }
   }
+};
+
+const renderPublicProfileReviews = (reviews = []) => {
+  publicProfileReviewsList.innerHTML = '';
+  publicProfileReviews = Array.isArray(reviews) ? [...reviews] : [];
+
+  if (!publicProfileReviews.length) {
+    setFeedback(publicProfileFeedback, "Ce voyageur n'a pas encore partagé d'avis.");
+    return;
+  }
+
+  setFeedback(publicProfileFeedback, '');
+  const fragment = document.createDocumentFragment();
+  publicProfileReviews.forEach((review) => {
+    const card = createReviewCard(review, { interactive: false });
+    fragment.appendChild(card);
+  });
+  publicProfileReviewsList.appendChild(fragment);
 };
 
 const highlightOnMap = (review) => {
@@ -1277,6 +1352,7 @@ const renderReviewDetailContent = (review) => {
 
   const authorBlock = document.createElement('div');
   authorBlock.className = 'detail-author';
+  authorBlock.tabIndex = 0;
 
   const authorAvatar = document.createElement('img');
   authorAvatar.className = 'detail-author__avatar';
@@ -1297,6 +1373,7 @@ const renderReviewDetailContent = (review) => {
 
   authorInfo.append(authorNameEl, authorMeta);
   authorBlock.append(authorAvatar, authorInfo);
+  attachUserProfileHandler(authorBlock, review.user);
 
   const hero = document.createElement('div');
   hero.className = 'detail-hero';
@@ -1485,6 +1562,82 @@ const loadProfile = async () => {
   } catch (error) {
     console.error(error);
     setFeedback(profileFeedback, error.message || 'Échec du chargement du profil', true);
+  }
+};
+
+const showPublicProfile = async (userId) => {
+  if (!userId) return;
+  publicProfileUserId = userId;
+  hideReviewDetail();
+  showView('public-profile-view');
+  setFeedback(publicProfileFeedback, 'Chargement du profil…');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  publicProfileReviewsList.innerHTML = '';
+  if (publicProfileAvatar) {
+    publicProfileAvatar.src = resolveAvatarUrl(null);
+    publicProfileAvatar.alt = 'Photo de profil du voyageur';
+  }
+  if (publicProfileTitle) {
+    publicProfileTitle.textContent = 'Chargement du profil';
+  }
+  if (publicProfileSubtitle) {
+    publicProfileSubtitle.textContent = 'Merci de patienter pendant le chargement des informations.';
+  }
+
+  try {
+    const [profilePayload, reviewsPayload] = await Promise.all([
+      api.auth.publicProfile(userId),
+      api.reviews.list({ user_id: userId, limit: 50 }),
+    ]);
+
+    const profile = profilePayload?.user || profilePayload;
+    if (!profile) {
+      throw new Error('Profil introuvable');
+    }
+
+    if (publicProfileTitle) {
+      publicProfileTitle.textContent = profile.username
+        ? `Profil de ${profile.username}`
+        : 'Profil du voyageur';
+    }
+    if (publicProfileSubtitle) {
+      const reviewCount = profile.reviews_count ?? 0;
+      const reviewLabel = reviewCount === 1 ? 'avis partagé' : 'avis partagés';
+      const reviewer = profile.username ? `par ${profile.username}` : 'par ce membre';
+      publicProfileSubtitle.textContent = `${reviewCount.toLocaleString('fr-FR')} ${reviewLabel} ${reviewer}.`;
+    }
+    publicProfileUsername.textContent = profile.username || 'Voyageur';
+    publicProfileBio.textContent = profile.bio?.trim() || 'Aucune biographie renseignée.';
+    publicProfileCreated.textContent = profile.created_at ? formatDate(profile.created_at) : '—';
+    publicProfileReviewsCount.textContent = (profile.reviews_count ?? 0).toLocaleString('fr-FR');
+    publicProfilePhotosCount.textContent = (profile.photos_count ?? 0).toLocaleString('fr-FR');
+    if (publicProfileAvatar) {
+      publicProfileAvatar.src = resolveAvatarUrl(profile.profile_photo_url);
+      publicProfileAvatar.alt = profile.username
+        ? `Photo de profil de ${profile.username}`
+        : 'Photo de profil du voyageur';
+    }
+
+    const reviews = reviewsPayload?.reviews || [];
+    renderPublicProfileReviews(reviews);
+  } catch (error) {
+    console.error(error);
+    setFeedback(publicProfileFeedback, error.message || 'Impossible de charger ce profil.', true);
+    if (publicProfileAvatar) {
+      publicProfileAvatar.src = resolveAvatarUrl(null);
+      publicProfileAvatar.alt = 'Photo de profil du voyageur';
+    }
+    if (publicProfileTitle) {
+      publicProfileTitle.textContent = 'Profil indisponible';
+    }
+    if (publicProfileSubtitle) {
+      publicProfileSubtitle.textContent = 'Nous ne parvenons pas à afficher ce profil pour le moment.';
+    }
+    publicProfileUsername.textContent = 'Voyageur';
+    publicProfileBio.textContent = 'Aucune biographie renseignée.';
+    publicProfileCreated.textContent = '—';
+    publicProfileReviewsCount.textContent = '0';
+    publicProfilePhotosCount.textContent = '0';
   }
 };
 
@@ -1915,6 +2068,21 @@ const initEventListeners = () => {
   }
   if (mapSearchForm) {
     mapSearchForm.addEventListener('submit', handleMapSearch);
+  }
+  if (publicProfileBackBtn) {
+    publicProfileBackBtn.addEventListener('click', () => {
+      setFeedback(publicProfileFeedback, '');
+      publicProfileReviewsList.innerHTML = '';
+      publicProfileReviews = [];
+      publicProfileUserId = null;
+      const destination = authToken ? 'feed-view' : 'auth-view';
+      showView(destination);
+      if (destination === 'feed-view') {
+        updateHeroStats(lastReviews);
+        renderMapFeed(lastReviews);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   }
 };
 

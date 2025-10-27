@@ -364,6 +364,59 @@
         </section>
       </section>
 
+      <!-- Public profile view -->
+      <section id="public-profile-view" class="view hidden" aria-label="Profil voyageur" data-animate>
+        <div class="view-header">
+          <div>
+            <h2 id="public-profile-title">Profil du voyageur</h2>
+            <p id="public-profile-subtitle" class="subtitle">
+              Découvrez les histoires partagées par ce membre de la communauté.
+            </p>
+          </div>
+          <button id="public-profile-back" type="button" class="secondary-btn">Retour au fil</button>
+        </div>
+
+        <section class="card profile-card" data-animate>
+          <div class="profile-avatar">
+            <img
+              id="public-profile-avatar"
+              src=""
+              alt="Photo de profil du voyageur"
+              class="profile-avatar__image"
+            />
+          </div>
+          <dl class="profile-details">
+            <div>
+              <dt>Nom d'utilisateur</dt>
+              <dd id="public-profile-username">—</dd>
+            </div>
+            <div>
+              <dt>Biographie</dt>
+              <dd id="public-profile-bio">Aucune biographie renseignée.</dd>
+            </div>
+            <div>
+              <dt>Membre depuis</dt>
+              <dd id="public-profile-created">—</dd>
+            </div>
+            <div>
+              <dt>Contributions</dt>
+              <dd>
+                <span id="public-profile-reviews-count">0</span> avis ·
+                <span id="public-profile-photos-count">0</span> photos
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card" data-animate>
+          <div>
+            <h3>Avis publiés</h3>
+          </div>
+          <ul id="public-profile-reviews" class="reviews"></ul>
+          <p id="public-profile-feedback" class="feedback" role="status"></p>
+        </section>
+      </section>
+
       <!-- Map view -->
       <section id="map-view" class="view hidden" aria-label="Carte interactive" data-animate>
         <div class="view-header">

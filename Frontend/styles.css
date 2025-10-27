@@ -798,6 +798,18 @@ iframe {
   box-shadow: 0 18px 32px rgba(15, 98, 255, 0.2);
 }
 
+.review-card--static {
+  cursor: default;
+}
+
+.review-card--static:hover,
+.review-card--static:focus-visible {
+  border-color: var(--color-border);
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  transform: none;
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+}
+
 .review-photo {
   margin: 0;
   display: grid;
@@ -844,6 +856,18 @@ iframe {
   border: 3px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-surface));
   background: color-mix(in srgb, var(--color-surface-alt) 65%, transparent);
   box-shadow: 0 10px 24px rgba(15, 98, 255, 0.18);
+}
+
+.is-link {
+  cursor: pointer;
+  color: var(--color-primary-strong);
+  text-decoration: none;
+}
+
+.is-link:hover,
+.is-link:focus-visible {
+  text-decoration: underline;
+  outline: none;
 }
 
 .profile-details {

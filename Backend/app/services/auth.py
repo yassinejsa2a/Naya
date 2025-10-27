@@ -325,3 +325,22 @@ class AuthService:
             'photos_count': user.photos_count,
             'member_since': user.created_at.isoformat() if user.created_at else None
         }
+
+    def get_public_profile(self, user_id):
+        """
+        Return limited public profile information for a user.
+        Args:
+            user_id (str): User identifier
+        Returns:
+            dict: Public profile data
+        Raises:
+            ValueError: If user is not found or inactive
+        """
+        user = self.user_repository.get(user_id)
+        if not user or not user.is_active:
+            raise ValueError("User not found")
+
+        profile = user.to_public_dict()
+        profile['reviews_count'] = user.reviews_count
+        profile['photos_count'] = user.photos_count
+        return profile

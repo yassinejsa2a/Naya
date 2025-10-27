@@ -173,6 +173,19 @@ def get_user_stats():
         return jsonify({"error": "Failed to get user stats"}), 500
 
 
+@auth_bp.route('/users/<user_id>', methods=['GET'])
+def public_profile(user_id):
+    """Get public profile information for a given user."""
+    try:
+        profile = auth_service.get_public_profile(user_id)
+        return jsonify({'user': profile}), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception:
+        current_app.logger.exception('Failed to load public profile')
+        return jsonify({'error': 'Failed to load profile'}), 500
+
+
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
 def refresh_token():
