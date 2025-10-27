@@ -338,30 +338,6 @@ class ReviewService:
         
         return result
     
-    def get_top_rated_reviews(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """
-        Get highest rated reviews
-        Args:
-            limit (int): Number of reviews
-        Returns:
-            List of top rated reviews
-        """
-        reviews = self.review_repository.get_top_rated_reviews(limit)
-        result = []
-        
-        for review in reviews:
-            review_data = review.to_dict()
-            # Add user and place info
-            user = self.user_repository.get(review.user_id)
-            place = self.place_repository.get(review.place_id)
-            
-            review_data['user'] = user.to_public_dict() if user else None
-            review_data['place'] = place.to_dict() if place else None
-            review_data['photos'] = self._get_photos_for_review(review.id)
-            result.append(review_data)
-        
-        return result
-    
     def search_reviews(self, search_term: str, limit: Optional[int] = 20) -> List[Dict[str, Any]]:
         """
         Search reviews

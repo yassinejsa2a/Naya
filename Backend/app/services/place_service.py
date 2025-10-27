@@ -192,28 +192,6 @@ class PlaceService:
         
         return result
     
-    def get_popular_places(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """
-        Get popular places (most reviewed)
-        Args:
-            limit (int): Maximum number of results
-        Returns:
-            list: Popular places with statistics
-        """
-        places = self.place_repository.get_popular_destinations(limit)
-        result = []
-        
-        for place in places:
-            place_data = place.to_dict()
-            
-            # Add statistics
-            place_data['review_count'] = self.review_repository.get_review_count_for_place(place.id)
-            place_data['average_rating'] = self.review_repository.get_average_rating_for_place(place.id)
-            
-            result.append(place_data)
-        
-        return result
-    
     def get_place_statistics(self, place_id: str) -> Dict[str, Any]:
         """
         Get detailed statistics for a place

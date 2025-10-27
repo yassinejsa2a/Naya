@@ -47,30 +47,6 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
-    def get_by_rating(self, min_rating: int, max_rating: int = 5, 
-                     limit: Optional[int] = None) -> List[Review]:
-        """
-        Get reviews by rating range
-        Args:
-            min_rating (int): Minimum rating
-            max_rating (int): Maximum rating
-            limit (int, optional): Limit results
-        Returns:
-            List of reviews in rating range
-        """
-        try:
-            query = Review.query.filter(
-                Review.rating >= min_rating,
-                Review.rating <= max_rating
-            ).order_by(Review.created_at.desc())
-            
-            if limit:
-                query = query.limit(limit)
-            
-            return query.all()
-        except Exception:
-            return []
-    
     def get_recent_reviews(self, limit: int = 10) -> List[Review]:
         """
         Get most recent reviews
@@ -81,19 +57,6 @@ class ReviewRepository(SQLAlchemyRepository):
         """
         try:
             return Review.query.order_by(Review.created_at.desc()).limit(limit).all()
-        except Exception:
-            return []
-    
-    def get_top_rated_reviews(self, limit: int = 10) -> List[Review]:
-        """
-        Get highest rated reviews
-        Args:
-            limit (int): Number of reviews to return
-        Returns:
-            List of top rated reviews
-        """
-        try:
-            return Review.query.order_by(Review.rating.desc(), Review.created_at.desc()).limit(limit).all()
         except Exception:
             return []
     
@@ -174,27 +137,6 @@ class ReviewRepository(SQLAlchemyRepository):
             return Review.query.filter_by(user_id=user_id, place_id=place_id).first() is not None
         except Exception:
             return False
-    
-    def get_reviews_with_photos(self, limit: Optional[int] = None) -> List[Review]:
-        """
-        Get reviews that have photos
-        Args:
-            limit (int, optional): Limit results
-        Returns:
-            List of reviews with photos
-        """
-        try:
-            from app.models.photo import Photo
-            from app import db
-            
-            query = db.session.query(Review).join(Photo).group_by(Review.id).order_by(Review.created_at.desc())
-            
-            if limit:
-                query = query.limit(limit)
-            
-            return query.all()
-        except Exception:
-            return []
     
     def get_rating_distribution_for_place(self, place_id: str) -> dict:
         """

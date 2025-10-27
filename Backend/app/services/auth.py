@@ -3,9 +3,14 @@
 Authentication Service for NAYA Travel Journal
 """
 
+import os
+import uuid
 from datetime import timedelta
+from typing import Optional
+
 from flask import current_app
 from flask_jwt_extended import create_access_token, create_refresh_token
+from werkzeug.utils import secure_filename
 
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -145,7 +150,7 @@ class AuthService:
             raise ValueError("User not found")
         
         # Remove sensitive fields that shouldn't be updated directly
-        sensitive_fields = ['password', 'password_hash', 'id', 'created_at']
+        sensitive_fields = ['password', 'password_hash', 'id', 'created_at', 'profile_photo', 'profile_photo_url']
         for field in sensitive_fields:
             update_data.pop(field, None)
         
@@ -200,6 +205,89 @@ class AuthService:
         user.save()
         
         return {'message': 'Password changed successfully'}
+
+    def update_profile_photo(self, user_id, file_storage):
+        """
+        Upload or replace the user's profile photo.
+        Args:
+            user_id (str): User identifier from JWT
+            file_storage (FileStorage): Uploaded avatar file
+        Returns:
+            dict: Message and refreshed profile data
+        """
+        user = self.user_repository.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        if not file_storage or not getattr(file_storage, 'filename', None):
+            raise ValueError("No file provided")
+
+        original_name = secure_filename(file_storage.filename)
+        if not original_name:
+            raise ValueError("Invalid file name")
+
+        if not self._is_allowed_avatar_file(original_name):
+            allowed = ", ".join(sorted(self._allowed_avatar_extensions()))
+            raise ValueError(f"Unsupported file type. Allowed types: {allowed}")
+
+        stored_filename = self._build_avatar_filename(original_name)
+        destination = self._resolve_avatar_path(stored_filename)
+
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        file_storage.save(destination)
+
+        self._delete_avatar_file(user.profile_photo)
+        user.profile_photo = stored_filename
+        user.save()
+
+        return {
+            'message': 'Profile photo updated successfully',
+            'profile_photo_url': user.profile_photo_url,
+            'user': user.to_dict(),
+        }
+
+    def _allowed_avatar_extensions(self):
+        config_extensions = current_app.config.get('AVATAR_EXTENSIONS')
+        if config_extensions:
+            return {ext.lower() for ext in config_extensions}
+        fallback = current_app.config.get('ALLOWED_EXTENSIONS')
+        if fallback:
+            return {ext.lower() for ext in fallback}
+        return {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+    def _is_allowed_avatar_file(self, filename: str) -> bool:
+        if '.' not in filename:
+            return False
+        extension = filename.rsplit('.', 1)[1].lower()
+        return extension in self._allowed_avatar_extensions()
+
+    def _build_avatar_filename(self, original_name: str) -> str:
+        extension = ''
+        if '.' in original_name:
+            extension = original_name.rsplit('.', 1)[1].lower()
+        unique_id = uuid.uuid4().hex
+        return f"{unique_id}.{extension}" if extension else unique_id
+
+    def _avatar_storage_root(self) -> str:
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+        if os.path.isabs(upload_folder):
+            base_dir = upload_folder
+        else:
+            base_dir = os.path.join(current_app.root_path, upload_folder)
+        return os.path.join(base_dir, 'avatars')
+
+    def _resolve_avatar_path(self, filename: str) -> str:
+        return os.path.join(self._avatar_storage_root(), filename)
+
+    def _delete_avatar_file(self, stored_filename: Optional[str]) -> None:
+        if not stored_filename:
+            return
+        try:
+            path = self._resolve_avatar_path(stored_filename)
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass
     
     def deactivate_user(self, user_id):
         """

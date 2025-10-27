@@ -552,6 +552,41 @@ iframe {
   gap: 1.1rem;
 }
 
+.detail-author {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  background: color-mix(in srgb, var(--color-primary-soft) 30%, var(--color-surface));
+}
+
+.detail-author__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-surface-alt) 65%, transparent);
+  box-shadow: 0 12px 20px rgba(15, 98, 255, 0.22);
+}
+
+.detail-author__info {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.detail-author__name {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.detail-author__meta {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
 .detail-placeholder {
   color: var(--color-muted);
   font-style: italic;
@@ -705,6 +740,50 @@ iframe {
     box-shadow var(--transition-base), background var(--transition-base);
 }
 
+.review-card__header {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.review-author {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.review-author__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-surface-alt) 60%, transparent);
+  box-shadow: 0 8px 18px rgba(15, 98, 255, 0.2);
+}
+
+.review-author__info {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.review-author__label {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.review-author__name {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.review-author__meta {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
 .review-card:hover,
 .review-card:focus-visible {
   border-color: var(--color-border-strong);
@@ -748,6 +827,23 @@ iframe {
 
 .profile-card {
   gap: clamp(1.2rem, 3vw, 1.8rem);
+}
+
+.profile-avatar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.profile-avatar__image {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-surface-alt) 65%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 98, 255, 0.18);
 }
 
 .profile-details {
@@ -954,6 +1050,26 @@ textarea {
   cursor: pointer;
   transition: border var(--transition-base), box-shadow var(--transition-base),
     transform var(--transition-base), background var(--transition-base);
+}
+
+.map-feed-author {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.map-feed-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid color-mix(in srgb, var(--color-primary) 30%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-surface-alt) 60%, transparent);
+}
+
+.map-feed-author-name {
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 .map-feed-entry:hover,

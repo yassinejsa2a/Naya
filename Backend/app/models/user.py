@@ -3,6 +3,7 @@
 User Model for NAYA Travel Journal
 """
 
+from flask import url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models.base_model import BaseModel, db
 
@@ -12,6 +13,7 @@ class User(BaseModel):
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    profile_photo = db.Column(db.String(500))
     
     # Profile information (Travel Journal specific)
     first_name = db.Column(db.String(50))
@@ -52,8 +54,10 @@ class User(BaseModel):
         user_dict = super().to_dict()
         # Remove sensitive information
         user_dict.pop('password_hash', None)
+        user_dict.pop('profile_photo', None)
         # Ensure boolean flags present
         user_dict['is_admin'] = bool(user_dict.get('is_admin'))
+        user_dict['profile_photo_url'] = self.profile_photo_url
         return user_dict
     
     def to_public_dict(self):
@@ -65,7 +69,8 @@ class User(BaseModel):
             'last_name': self.last_name,
             'bio': self.bio,
             'location': self.location,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'profile_photo_url': self.profile_photo_url,
         }
     
     @property
@@ -84,6 +89,19 @@ class User(BaseModel):
     def photos_count(self):
         """Get number of photos by user"""
         return len(self.photos)
+
+    @property
+    def profile_photo_url(self):
+        """Return an absolute URL to the user's profile photo if available."""
+        if not self.profile_photo:
+            return None
+        try:
+            return url_for('v1.auth.serve_avatar', filename=self.profile_photo, _external=True)
+        except RuntimeError:
+            # Outside request context; best effort return stored value
+            return self.profile_photo
+        except Exception:
+            return None
     
     def validate_email(self):
         """Validate email format"""

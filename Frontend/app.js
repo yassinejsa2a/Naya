@@ -15,9 +15,9 @@ const mapView = document.getElementById('map-view');
 const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
 const reviewForm = document.getElementById('review-form');
-const photoForm = document.getElementById('photo-form');
 const searchForm = document.getElementById('search-form');
 const profileForm = document.getElementById('profile-form');
+const profilePhotoForm = document.getElementById('profile-photo-form');
 const passwordForm = document.getElementById('password-form');
 const deactivateForm = document.getElementById('deactivate-form');
 
@@ -44,6 +44,7 @@ const profileUsername = document.getElementById('profile-username');
 const profileEmail = document.getElementById('profile-email');
 const profileCreated = document.getElementById('profile-created');
 const profileReviewCount = document.getElementById('profile-review-count');
+const profileAvatar = document.getElementById('profile-avatar');
 
 const tabs = Array.from(document.querySelectorAll('.tab'));
 const themeToggle = document.getElementById('theme-toggle');
@@ -53,6 +54,12 @@ const animatedElements = Array.from(document.querySelectorAll('[data-animate]'))
 
 const THEME_STORAGE_KEY = 'naya-theme';
 const REFRESH_TOKEN_KEY = 'naya-refresh-token';
+const DEFAULT_AVATAR =
+  'data:image/svg+xml;charset=UTF-8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><rect width="96" height="96" rx="24" fill="#1b3a4b"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Poppins, sans-serif" font-size="36" fill="#ffffff">N</text></svg>'
+  );
+const resolveAvatarUrl = (url) => (url ? url : DEFAULT_AVATAR);
 let revealObserver = null;
 
 let storageAvailable = true;
@@ -160,8 +167,10 @@ const attachSystemThemeListener = () => {
 };
 
 const initTheme = () => {
-  applyTheme('dark');
-  safeStorageRemove(THEME_STORAGE_KEY);
+  const storedTheme = getStoredTheme();
+  const initialTheme = storedTheme || getPreferredTheme();
+  applyTheme(initialTheme);
+  attachSystemThemeListener();
 };
 
 const observeAnimatedElement = (element) => {
@@ -409,6 +418,15 @@ const setFeedback = (element, message, isError = false) => {
   element.classList.toggle('error', Boolean(message) && isError);
 };
 
+const setProfileAvatar = (url, username = '') => {
+  if (!profileAvatar) return;
+  const finalUrl = resolveAvatarUrl(url);
+  if (profileAvatar.src !== finalUrl) {
+    profileAvatar.src = finalUrl;
+  }
+  profileAvatar.alt = username ? `Photo de profil de ${username}` : 'Photo de profil';
+};
+
 const setMapFeedback = (message, isError = false) => {
   setFeedback(mapSearchFeedback, message, isError);
 };
@@ -432,14 +450,7 @@ const buildPlaceCacheKey = (name, city, country) =>
   );
 
 const findExistingPlaceId = async (name, city, country) => {
-  const query = buildQueryString({
-    search: name,
-    city,
-    country,
-    limit: 10,
-  });
-
-  if (!query) {
+  if (!name && !city && !country) {
     return null;
   }
 
@@ -448,8 +459,15 @@ const findExistingPlaceId = async (name, city, country) => {
     return placeIdCache.get(cacheKey);
   }
 
+  const searchParams = {
+    search: name,
+    city,
+    country,
+    limit: 10,
+  };
+
   try {
-    const response = await fetchJson(`/places${query}`);
+    const response = await api.places.search(searchParams);
     const candidates = Array.isArray(response?.places) ? response.places : [];
     const targetName = name.toLowerCase();
     const targetCity = city.toLowerCase();
@@ -495,19 +513,12 @@ const ensurePlaceId = async (payload) => {
   }
 
   try {
-    const response = await fetchJson(
-      '/places',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          city,
-          country,
-          description: description || undefined,
-        }),
-      },
-      { requiresAuth: true }
-    );
+    const response = await api.places.create({
+      name,
+      city,
+      country,
+      description: description || undefined,
+    });
 
     const createdPlace = response?.data;
     if (createdPlace?.id) {
@@ -598,16 +609,95 @@ const fetchJson = async (
   return data;
 };
 
+const api = {
+  reviews: {
+    list: (params = {}) => fetchJson(`/reviews${buildQueryString(params)}`),
+    get: (id) => fetchJson(`/reviews/${id}`),
+    create: (payload) =>
+      fetchJson(
+        '/reviews',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+        { requiresAuth: true }
+      ),
+    update: (id, payload) =>
+      fetchJson(
+        `/reviews/${id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        },
+        { requiresAuth: true }
+      ),
+    delete: (id) => fetchJson(`/reviews/${id}`, { method: 'DELETE' }, { requiresAuth: true }),
+  },
+  auth: {
+    login: (credentials) =>
+      fetchJson('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      }),
+    register: (payload) =>
+      fetchJson('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    profile: () => fetchJson('/auth/profile', { method: 'GET' }, { requiresAuth: true }),
+    updateProfile: (payload) =>
+      fetchJson(
+        '/auth/profile',
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        },
+        { requiresAuth: true }
+      ),
+    changePassword: (payload) =>
+      fetchJson(
+        '/auth/change-password',
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        },
+        { requiresAuth: true }
+      ),
+    updateAvatar: (formData) =>
+      fetchJson('/auth/avatar', { method: 'PUT', body: formData }, { requiresAuth: true }),
+    deactivate: () => fetchJson('/auth/deactivate', { method: 'PUT' }, { requiresAuth: true }),
+    stats: () => fetchJson('/auth/stats', { method: 'GET' }, { requiresAuth: true }),
+    refresh: () =>
+      fetchJson(
+        '/auth/refresh',
+        { method: 'POST' },
+        { requiresAuth: true, skipRefresh: true, useRefreshToken: true }
+      ),
+  },
+  places: {
+    search: (params = {}) => fetchJson(`/places${buildQueryString(params)}`),
+    create: (payload) =>
+      fetchJson(
+        '/places',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+        { requiresAuth: true }
+      ),
+  },
+  photos: {
+    upload: (formData) => fetchJson('/photos', { method: 'POST', body: formData }, { requiresAuth: true }),
+    delete: (photoId) => fetchJson(`/photos/${photoId}`, { method: 'DELETE' }, { requiresAuth: true }),
+  },
+};
+
 const refreshAccessToken = async () => {
   if (!refreshToken) {
     throw new Error('Session expirée. Merci de vous reconnecter.');
   }
 
-  const response = await fetchJson(
-    '/auth/refresh',
-    { method: 'POST' },
-    { requiresAuth: true, skipRefresh: true, useRefreshToken: true }
-  );
+  const response = await api.auth.refresh();
 
   const newToken = response?.access_token;
   if (!newToken) {
@@ -689,6 +779,21 @@ const renderMapFeed = (reviews = []) => {
     item.dataset.reviewId = review.id;
     item.classList.add('map-feed-entry');
 
+    const authorBlock = document.createElement('div');
+    authorBlock.className = 'map-feed-author';
+
+    const authorAvatar = document.createElement('img');
+    authorAvatar.className = 'map-feed-avatar';
+    authorAvatar.src = resolveAvatarUrl(review.user?.profile_photo_url);
+    authorAvatar.alt = review.user?.username ? `Avatar de ${review.user.username}` : 'Avatar voyageur';
+    authorAvatar.loading = 'lazy';
+
+    const authorName = document.createElement('span');
+    authorName.className = 'map-feed-author-name';
+    authorName.textContent = review.user?.username || 'Voyageur anonyme';
+
+    authorBlock.append(authorAvatar, authorName);
+
     const title = document.createElement('span');
     title.className = 'map-feed-title';
     title.textContent = review.title || 'Avis sans titre';
@@ -699,8 +804,7 @@ const renderMapFeed = (reviews = []) => {
       ? `${review.place.city}, ${review.place.country || ''}`.trim()
       : review.place?.name || 'Lieu non cartographié';
     meta.textContent = `${locationLabel} • ★ ${review.rating ?? '—'}`;
-
-    item.append(title, meta);
+    item.append(authorBlock, title, meta);
 
     item.addEventListener('click', () => {
       highlightOnMap(review);
@@ -763,14 +867,46 @@ const renderReviews = (reviews = []) => {
       }
     });
 
+    const header = document.createElement('div');
+    header.className = 'review-card__header';
+
+    const authorBlock = document.createElement('div');
+    authorBlock.className = 'review-author';
+
+    const authorAvatar = document.createElement('img');
+    authorAvatar.className = 'review-author__avatar';
+    authorAvatar.src = resolveAvatarUrl(review.user?.profile_photo_url);
+    authorAvatar.alt = review.user?.username
+      ? `Avatar de ${review.user.username}`
+      : 'Avatar voyageur';
+    authorAvatar.loading = 'lazy';
+
+    const authorInfo = document.createElement('div');
+    authorInfo.className = 'review-author__info';
+
+    const authorLabel = document.createElement('span');
+    authorLabel.className = 'review-author__label';
+    authorLabel.textContent = 'Publié par';
+
+    const authorName = document.createElement('span');
+    authorName.className = 'review-author__name';
+    authorName.textContent = review.user?.username || 'Voyageur anonyme';
+
+    const authorDate = document.createElement('span');
+    authorDate.className = 'review-author__meta';
+    const createdLabel = review.created_at ? formatDate(review.created_at) : null;
+    authorDate.textContent = createdLabel ? `Publié le ${createdLabel}` : 'Publication en attente';
+
+    authorInfo.append(authorLabel, authorName, authorDate);
+    authorBlock.append(authorAvatar, authorInfo);
+
     const title = document.createElement('h3');
     title.textContent = review.title || 'Expérience sans titre';
 
+    header.append(authorBlock, title);
+
     const meta = document.createElement('div');
     meta.className = 'review-meta';
-
-    const author = document.createElement('span');
-    author.textContent = review.user?.username ? `Par ${review.user.username}` : 'Voyageur anonyme';
 
     const location = document.createElement('span');
     location.textContent = review.place?.city
@@ -781,10 +917,7 @@ const renderReviews = (reviews = []) => {
     rating.className = 'rating';
     rating.textContent = `★ ${review.rating ?? '—'}`;
 
-    const created = document.createElement('span');
-    created.textContent = formatDate(review.created_at);
-
-    const metaChildren = [author, location, rating, created];
+    const metaChildren = [location, rating];
     if (review.visit_date) {
       const visitDate = document.createElement('span');
       visitDate.textContent = `Visité le ${formatDate(review.visit_date)}`;
@@ -796,7 +929,7 @@ const renderReviews = (reviews = []) => {
     const content = document.createElement('p');
     content.textContent = review.content || 'Aucune description fournie.';
 
-    item.append(title, meta, content);
+    item.append(header, meta, content);
 
     if (Array.isArray(review.photos) && review.photos.length) {
       const gallery = document.createElement('div');
@@ -904,9 +1037,6 @@ const hideReviewDetail = () => {
   highlightedReviewId = null;
   highlightReviewItems();
   removeReviewEditForm();
-  if (photoForm?.review_id) {
-    photoForm.review_id.value = '';
-  }
 };
 
 const buildRatingLabel = (rating) => {
@@ -951,7 +1081,7 @@ const handleReviewDelete = async (reviewId) => {
   }
 
   try {
-    await fetchJson(`/reviews/${reviewId}`, { method: 'DELETE' }, { requiresAuth: true });
+    await api.reviews.delete(reviewId);
     currentDetailReviewId = null;
     highlightedReviewId = null;
     activeEditReviewId = null;
@@ -975,7 +1105,7 @@ const handlePhotoDelete = async (photoId) => {
   }
 
   try {
-    await fetchJson(`/photos/${photoId}`, { method: 'DELETE' }, { requiresAuth: true });
+    await api.photos.delete(photoId);
     showGlobalMessage('Photo supprimée avec succès.');
     await loadFeed();
     await showReviewDetail(currentDetailReviewId);
@@ -1112,14 +1242,7 @@ const handleReviewEditSubmit = async (event) => {
 
   try {
     setFeedback(reviewFeedback, 'Mise à jour de votre avis…');
-    await fetchJson(
-      `/reviews/${reviewId}`,
-      {
-        method: 'PUT',
-        body: JSON.stringify(updateData),
-      },
-      { requiresAuth: true }
-    );
+    await api.reviews.update(reviewId, updateData);
 
     removeReviewEditForm();
     setFeedback(reviewFeedback, 'Avis mis à jour avec succès.');
@@ -1137,20 +1260,43 @@ const renderReviewDetailContent = (review) => {
   removeReviewEditForm();
 
   const place = review.place || {};
-  const author = review.user?.username ? `Par ${review.user.username}` : 'Voyageur anonyme';
   const visitDate = review.visit_date ? formatDate(review.visit_date) : null;
   const createdAt = review.created_at ? formatDate(review.created_at) : null;
+  const authorName = review.user?.username || 'Voyageur anonyme';
 
   if (reviewDetailTitle) {
     reviewDetailTitle.textContent = review.title || 'Avis sans titre';
   }
 
   if (reviewDetailMeta) {
-    const bits = [buildRatingLabel(review.rating), author];
+    const bits = [buildRatingLabel(review.rating)];
     if (visitDate) bits.push(`Visité le ${visitDate}`);
-    else if (createdAt) bits.push(`Publié le ${createdAt}`);
+    if (!visitDate && createdAt) bits.push(`Publié le ${createdAt}`);
     reviewDetailMeta.textContent = bits.filter(Boolean).join(' • ');
   }
+
+  const authorBlock = document.createElement('div');
+  authorBlock.className = 'detail-author';
+
+  const authorAvatar = document.createElement('img');
+  authorAvatar.className = 'detail-author__avatar';
+  authorAvatar.src = resolveAvatarUrl(review.user?.profile_photo_url);
+  authorAvatar.alt = review.user?.username ? `Avatar de ${review.user.username}` : 'Avatar voyageur';
+  authorAvatar.loading = 'lazy';
+
+  const authorInfo = document.createElement('div');
+  authorInfo.className = 'detail-author__info';
+
+  const authorNameEl = document.createElement('span');
+  authorNameEl.className = 'detail-author__name';
+  authorNameEl.textContent = authorName;
+
+  const authorMeta = document.createElement('span');
+  authorMeta.className = 'detail-author__meta';
+  authorMeta.textContent = createdAt ? `Publié le ${createdAt}` : 'Publication en attente';
+
+  authorInfo.append(authorNameEl, authorMeta);
+  authorBlock.append(authorAvatar, authorInfo);
 
   const hero = document.createElement('div');
   hero.className = 'detail-hero';
@@ -1201,11 +1347,8 @@ const renderReviewDetailContent = (review) => {
     placeBlock.appendChild(placeDescription);
   }
 
-  reviewDetailBody.append(hero, contentBlock, placeBlock);
+  reviewDetailBody.append(authorBlock, hero, contentBlock, placeBlock);
 
-  if (photoForm?.review_id) {
-    photoForm.review_id.value = review.id || '';
-  }
 
   if (canManageReview(review)) {
     const actions = document.createElement('div');
@@ -1290,7 +1433,7 @@ const showReviewDetail = async (reviewId) => {
   clearDetailPanel();
 
   try {
-    const response = await fetchJson(`/reviews/${reviewId}`);
+    const response = await api.reviews.get(reviewId);
     const review = response?.data || response;
 
     if (!review) {
@@ -1312,8 +1455,7 @@ const showReviewDetail = async (reviewId) => {
 const loadFeed = async (query = {}) => {
   try {
     setFeedback(feedFeedback, 'Chargement des aventures…');
-    const qs = buildQueryString(query);
-    const data = await fetchJson(`/reviews${qs}`);
+    const data = await api.reviews.list(query);
     lastReviews = data.reviews || [];
     renderReviews(lastReviews);
     setFeedback(feedFeedback, lastReviews.length ? '' : '');
@@ -1329,16 +1471,14 @@ const loadFeed = async (query = {}) => {
 const loadProfile = async () => {
   if (!authToken) return;
   try {
-    const [profile, stats] = await Promise.all([
-      fetchJson('/auth/profile', { method: 'GET' }, { requiresAuth: true }),
-      fetchJson('/auth/stats', { method: 'GET' }, { requiresAuth: true }),
-    ]);
+    const [profile, stats] = await Promise.all([api.auth.profile(), api.auth.stats()]);
 
     currentUser = profile;
     profileUsername.textContent = profile.username || 'Voyageur';
     profileEmail.textContent = profile.email || '—';
     profileCreated.textContent = formatDate(profile.created_at);
     profileReviewCount.textContent = stats.reviews_count ?? '0';
+    setProfileAvatar(profile.profile_photo_url, profile.username || '');
 
     profileForm.username.value = profile.username || '';
     profileForm.bio.value = profile.bio || '';
@@ -1351,6 +1491,7 @@ const loadProfile = async () => {
 const saveAuthState = (token, user, refresh, { silent = false } = {}) => {
   authToken = token || null;
   currentUser = user || null;
+  setProfileAvatar(user?.profile_photo_url, user?.username || '');
 
   if (token) {
     safeStorageSet('naya-token', token);
@@ -1424,10 +1565,7 @@ const handleLogin = async (event) => {
 
   try {
     setFeedback(authFeedback, 'Connexion en cours…');
-    const data = await fetchJson('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    const data = await api.auth.login(payload);
 
     saveAuthState(data.access_token, data.user, data.refresh_token);
     setFeedback(authFeedback, 'Ravi de vous revoir ! Redirection vers votre fil.');
@@ -1456,10 +1594,7 @@ const handleRegister = async (event) => {
 
   try {
     setFeedback(authFeedback, 'Création de votre compte…');
-    await fetchJson('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    await api.auth.register(payload);
 
     setFeedback(authFeedback, 'Compte créé ! Vous pouvez maintenant vous connecter.', false);
     registerForm.reset();
@@ -1496,7 +1631,7 @@ const handleMapSearch = async (event) => {
 
   try {
     setMapFeedback('Recherche en cours…');
-    const data = await fetchJson(`/reviews${buildQueryString({ search: term })}`);
+    const data = await api.reviews.list({ search: term });
     const results = data.reviews || [];
     renderMapFeed(results);
     if (results.length) {
@@ -1573,14 +1708,7 @@ const handleReviewSubmit = async (event) => {
 
   try {
     setFeedback(reviewFeedback, 'Publication de votre avis…');
-    const response = await fetchJson(
-      '/reviews',
-      {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      },
-      { requiresAuth: true }
-    );
+    const response = await api.reviews.create(payload);
 
     const createdReview = response?.data?.review;
     const createdReviewId = createdReview?.id || null;
@@ -1598,14 +1726,7 @@ const handleReviewSubmit = async (event) => {
 
       setFeedback(reviewFeedback, 'Avis publié. Téléversement de la photo…');
       try {
-        await fetchJson(
-          '/photos',
-          {
-            method: 'POST',
-            body: photoPayload,
-          },
-          { requiresAuth: true }
-        );
+        await api.photos.upload(photoPayload);
       } catch (uploadError) {
         console.error(uploadError);
         photoError = uploadError;
@@ -1647,15 +1768,49 @@ const handleProfileUpdate = async (event) => {
 
   try {
     setFeedback(profileFeedback, 'Mise à jour du profil…');
-    const result = await fetchJson('/auth/profile', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }, { requiresAuth: true });
+    const result = await api.auth.updateProfile(payload);
 
     setFeedback(profileFeedback, result.message || 'Profil mis à jour !');
     await loadProfile();
   } catch (error) {
     setFeedback(profileFeedback, error.message || 'Impossible de mettre le profil à jour', true);
+  }
+};
+
+const handleProfilePhotoUpdate = async (event) => {
+  event.preventDefault();
+  if (!profilePhotoForm) return;
+  if (!authToken) {
+    setFeedback(profileFeedback, 'Vous devez être connecté pour changer votre photo de profil.', true);
+    return;
+  }
+
+  const formData = new FormData(profilePhotoForm);
+  const avatarFile = formData.get('avatar');
+  if (!(avatarFile instanceof File) || !avatarFile.name) {
+    setFeedback(profileFeedback, 'Sélectionnez une image avant de téléverser.', true);
+    return;
+  }
+
+  try {
+    setFeedback(profileFeedback, 'Téléversement de votre photo…');
+    const result = await api.auth.updateAvatar(formData);
+    const updatedUser = result?.user || currentUser;
+    if (updatedUser) {
+      saveAuthState(authToken, updatedUser, refreshToken, { silent: true });
+      setProfileAvatar(updatedUser.profile_photo_url, updatedUser.username || '');
+    } else if (result?.profile_photo_url) {
+      setProfileAvatar(result.profile_photo_url, currentUser?.username || '');
+    }
+    profilePhotoForm.reset();
+    setFeedback(profileFeedback, result?.message || 'Photo de profil mise à jour !');
+    await loadProfile();
+  } catch (error) {
+    setFeedback(
+      profileFeedback,
+      error.message || 'Impossible de mettre à jour la photo de profil',
+      true
+    );
   }
 };
 
@@ -1666,10 +1821,7 @@ const handlePasswordChange = async (event) => {
 
   try {
     setFeedback(profileFeedback, 'Mise à jour du mot de passe…');
-    const result = await fetchJson('/auth/change-password', {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    }, { requiresAuth: true });
+    const result = await api.auth.changePassword(payload);
 
     setFeedback(profileFeedback, result.message || 'Mot de passe mis à jour.');
     passwordForm.reset();
@@ -1686,9 +1838,7 @@ const handleDeactivate = async (event) => {
 
   try {
     setFeedback(profileFeedback, 'Désactivation du compte…');
-    const result = await fetchJson('/auth/deactivate', {
-      method: 'PUT',
-    }, { requiresAuth: true });
+    const result = await api.auth.deactivate();
 
     setFeedback(profileFeedback, result.message || 'Compte désactivé.');
     clearAuthState();
@@ -1743,6 +1893,9 @@ const initEventListeners = () => {
   searchForm.addEventListener('submit', handleSearch);
   reviewForm.addEventListener('submit', handleReviewSubmit);
   profileForm.addEventListener('submit', handleProfileUpdate);
+  if (profilePhotoForm) {
+    profilePhotoForm.addEventListener('submit', handleProfilePhotoUpdate);
+  }
   passwordForm.addEventListener('submit', handlePasswordChange);
   deactivateForm.addEventListener('submit', handleDeactivate);
   logoutBtn.addEventListener('click', handleLogout);
@@ -1770,6 +1923,7 @@ const initApp = () => {
   yearEl.textContent = new Date().getFullYear();
   initRevealAnimations();
   updateApiIndicator();
+  setProfileAvatar(null);
   if (window.location.protocol === 'https:' && apiBaseUrl.startsWith('http://')) {
     showGlobalMessage(
       "Cette page est servie en HTTPS. Assurez-vous que l'API répond en HTTPS pour éviter les requêtes bloquées.",

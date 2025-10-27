@@ -76,6 +76,9 @@ def _ensure_schema_integrity():
     if 'is_admin' not in user_columns:
         with db.engine.begin() as connection:
             connection.execute(text('ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0'))
+    if 'profile_photo' not in user_columns:
+        with db.engine.begin() as connection:
+            connection.execute(text('ALTER TABLE users ADD COLUMN profile_photo VARCHAR(500)'))
 
 
 def _apply_environment_overrides(app):

@@ -3,7 +3,9 @@
 Authentication API endpoints
 """
 
-from flask import Blueprint, request, jsonify
+import os
+
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from app.services.auth import AuthService
 
@@ -107,6 +109,40 @@ def change_password():
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": "Failed to change password"}), 500
+
+@auth_bp.route('/avatar', methods=['PUT'])
+@jwt_required()
+def update_avatar():
+    """Upload or replace the authenticated user's profile photo."""
+    try:
+        current_user_id = get_jwt_identity()
+        file_storage = (
+            request.files.get('avatar')
+            or request.files.get('file')
+            or (next(iter(request.files.values())) if request.files else None)
+        )
+
+        if not file_storage:
+            return jsonify({"error": "No file provided"}), 400
+
+        result = auth_service.update_profile_photo(current_user_id, file_storage)
+        return jsonify(result), 200
+
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception:
+        current_app.logger.exception('Failed to update avatar')
+        return jsonify({"error": "Failed to update profile photo"}), 500
+
+@auth_bp.route('/avatar/<path:filename>', methods=['GET'])
+def serve_avatar(filename):
+    """Serve stored profile photos."""
+    upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+    if os.path.isabs(upload_folder):
+        directory = os.path.join(upload_folder, 'avatars')
+    else:
+        directory = os.path.join(current_app.root_path, upload_folder, 'avatars')
+    return send_from_directory(directory, filename)
 
 @auth_bp.route('/deactivate', methods=['PUT'])
 @jwt_required()

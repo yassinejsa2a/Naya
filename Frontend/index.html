@@ -288,6 +288,9 @@
         </div>
 
         <section class="card profile-card" data-animate>
+          <div class="profile-avatar">
+            <img id="profile-avatar" src="" alt="Photo de profil" class="profile-avatar__image" />
+          </div>
           <dl class="profile-details">
             <div>
               <dt>Nom d'utilisateur</dt>
@@ -324,6 +327,15 @@
               </label>
             </div>
             <button type="submit" class="secondary-btn">Enregistrer les modifications</button>
+          </form>
+
+          <form id="profile-photo-form" class="form" data-animate enctype="multipart/form-data">
+            <h3>Mettre à jour la photo de profil</h3>
+            <label>
+              Choisir une photo
+              <input type="file" name="avatar" accept="image/*" required />
+            </label>
+            <button type="submit" class="secondary-btn">Téléverser</button>
           </form>
 
           <form id="password-form" class="form" data-animate>
