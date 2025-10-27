@@ -15,6 +15,7 @@ const mapView = document.getElementById('map-view');
 const loginForm = document.getElementById('login-form');
 const registerForm = document.getElementById('register-form');
 const reviewForm = document.getElementById('review-form');
+const photoForm = document.getElementById('photo-form');
 const searchForm = document.getElementById('search-form');
 const profileForm = document.getElementById('profile-form');
 const passwordForm = document.getElementById('password-form');
@@ -35,6 +36,9 @@ const mapFrame = document.getElementById('map-frame');
 const mapFeedList = document.getElementById('map-feed-list');
 const heroReviewCount = document.getElementById('hero-review-count');
 const heroDestinations = document.getElementById('hero-destinations');
+const mapSearchForm = document.getElementById('map-search-form');
+const mapSearchInput = document.getElementById('map-search-input');
+const mapSearchFeedback = document.getElementById('map-search-feedback');
 
 const profileUsername = document.getElementById('profile-username');
 const profileEmail = document.getElementById('profile-email');
@@ -48,6 +52,7 @@ const themeToggleLabel = themeToggle?.querySelector('.icon-toggle__label') || nu
 const animatedElements = Array.from(document.querySelectorAll('[data-animate]'));
 
 const THEME_STORAGE_KEY = 'naya-theme';
+const REFRESH_TOKEN_KEY = 'naya-refresh-token';
 let revealObserver = null;
 
 let storageAvailable = true;
@@ -294,11 +299,15 @@ if (storedApiBase) {
 }
 
 let authToken = safeStorageGet('naya-token');
+let refreshToken = safeStorageGet(REFRESH_TOKEN_KEY);
 let currentUser = null;
 let lastReviews = [];
+let mapReviews = [];
 let highlightedReviewId = null;
 let globalMessageTimeoutId;
 let currentDetailReviewId = null;
+let lastCreatedReviewId = null;
+let activeEditReviewId = null;
 const placeIdCache = new Map();
 
 const formatDate = (iso) => {
@@ -398,6 +407,10 @@ const setFeedback = (element, message, isError = false) => {
   if (!element) return;
   element.textContent = message;
   element.classList.toggle('error', Boolean(message) && isError);
+};
+
+const setMapFeedback = (message, isError = false) => {
+  setFeedback(mapSearchFeedback, message, isError);
 };
 
 const buildQueryString = (params = {}) => {
@@ -520,7 +533,11 @@ const ensurePlaceId = async (payload) => {
   throw new Error("Impossible de déterminer l'identifiant du lieu.");
 };
 
-const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) => {
+const fetchJson = async (
+  endpoint,
+  options = {},
+  { requiresAuth = false, skipRefresh = false, useRefreshToken = false } = {}
+) => {
   const url = `${apiBaseUrl}${endpoint}`;
   const headers = options.headers ? { ...options.headers } : {};
 
@@ -529,8 +546,9 @@ const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) 
   }
 
   if (requiresAuth) {
-    if (!authToken) throw new Error('Authentification requise');
-    headers.Authorization = `Bearer ${authToken}`;
+    const tokenToUse = useRefreshToken ? refreshToken : authToken;
+    if (!tokenToUse) throw new Error('Authentification requise');
+    headers.Authorization = `Bearer ${tokenToUse}`;
   }
 
   let response;
@@ -555,14 +573,49 @@ const fetchJson = async (endpoint, options = {}, { requiresAuth = false } = {}) 
     showGlobalMessage(friendlyMessage, true, 8000);
     throw new Error(friendlyMessage);
   }
+  if (response.status === 401 && requiresAuth && !skipRefresh && refreshToken && !useRefreshToken) {
+    try {
+      await refreshAccessToken();
+      headers.Authorization = `Bearer ${authToken}`;
+      response = await fetch(url, { ...options, headers });
+    } catch (refreshError) {
+      clearAuthState();
+      throw refreshError;
+    }
+  }
+
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     const errorMessage = data.error || data.message || 'La requête a échoué';
+    if (response.status === 401 && requiresAuth) {
+      clearAuthState();
+      throw new Error('Session expirée. Merci de vous reconnecter.');
+    }
     throw new Error(errorMessage);
   }
 
   return data;
+};
+
+const refreshAccessToken = async () => {
+  if (!refreshToken) {
+    throw new Error('Session expirée. Merci de vous reconnecter.');
+  }
+
+  const response = await fetchJson(
+    '/auth/refresh',
+    { method: 'POST' },
+    { requiresAuth: true, skipRefresh: true, useRefreshToken: true }
+  );
+
+  const newToken = response?.access_token;
+  if (!newToken) {
+    throw new Error('Impossible de rafraîchir la session.');
+  }
+
+  saveAuthState(newToken, currentUser, refreshToken, { silent: true });
+  return newToken;
 };
 
 const updateHeroStats = (reviews = []) => {
@@ -613,7 +666,10 @@ const highlightReviewItems = () => {
 
 const renderMapFeed = (reviews = []) => {
   if (!mapFeedList) return;
+  mapReviews = Array.isArray(reviews) ? [...reviews] : [];
   mapFeedList.innerHTML = '';
+
+  setMapFeedback('');
 
   if (!reviews.length) {
     const emptyItem = document.createElement('li');
@@ -621,6 +677,7 @@ const renderMapFeed = (reviews = []) => {
     emptyItem.textContent = 'Aucun avis à afficher pour le moment.';
     mapFeedList.appendChild(emptyItem);
     highlightReviewItems();
+    setMapFeedback('Aucun avis à afficher pour le moment.', true);
     return;
   }
 
@@ -757,10 +814,20 @@ const renderReviews = (reviews = []) => {
         img.loading = 'lazy';
         figure.appendChild(img);
 
+        const captionBlock = document.createElement('figcaption');
         if (photo.caption) {
-          const caption = document.createElement('figcaption');
+          const caption = document.createElement('span');
           caption.textContent = photo.caption;
-          figure.appendChild(caption);
+          captionBlock.appendChild(caption);
+        }
+        if (photo.user?.username) {
+          const owner = document.createElement('span');
+          owner.className = 'photo-owner';
+          owner.textContent = `Partagée par ${photo.user.username}`;
+          captionBlock.appendChild(owner);
+        }
+        if (captionBlock.childNodes.length) {
+          figure.appendChild(captionBlock);
         }
 
         gallery.appendChild(figure);
@@ -797,10 +864,14 @@ const highlightOnMap = (review) => {
   const place = review.place || {};
   let mapUrl;
   if (place.latitude && place.longitude) {
-    mapUrl = `https://maps.google.com/maps?q=${place.latitude},${place.longitude}&z=12&output=embed`;
+    const marker = `${place.latitude},${place.longitude}`;
+    mapUrl = `https://maps.google.com/maps?q=${marker}&z=12&iwloc=&output=embed&markers=${marker}`;
   } else if (place.city || place.name) {
-    const query = encodeURIComponent(`${place.name || ''} ${place.city || ''} ${place.country || ''}`.trim());
-    mapUrl = `https://maps.google.com/maps?q=${query}&z=10&output=embed`;
+    const label = `${place.name || ''} ${place.city || ''} ${place.country || ''}`.trim();
+    if (label) {
+      const query = encodeURIComponent(label);
+      mapUrl = `https://maps.google.com/maps?q=${query}&z=10&iwloc=&output=embed`;
+    }
   }
 
   if (mapUrl) {
@@ -832,6 +903,10 @@ const hideReviewDetail = () => {
   currentDetailReviewId = null;
   highlightedReviewId = null;
   highlightReviewItems();
+  removeReviewEditForm();
+  if (photoForm?.review_id) {
+    photoForm.review_id.value = '';
+  }
 };
 
 const buildRatingLabel = (rating) => {
@@ -840,10 +915,226 @@ const buildRatingLabel = (rating) => {
   return `${stars} (${rating}/5)`;
 };
 
+const userOwnsResource = (resourceUserId) => {
+  if (!currentUser || !resourceUserId) return false;
+  return currentUser.id === resourceUserId;
+};
+
+const canManageReview = (review) => {
+  if (!currentUser || !review) return false;
+  const ownerId = review.user_id || review.user?.id;
+  return Boolean(currentUser.is_admin || userOwnsResource(ownerId));
+};
+
+const canManagePhoto = (photo) => {
+  if (!currentUser || !photo) return false;
+  return Boolean(currentUser.is_admin || userOwnsResource(photo.user_id));
+};
+
+const removeReviewEditForm = () => {
+  const existing = reviewDetailBody?.querySelector('.review-edit-form');
+  if (existing) {
+    existing.removeEventListener('submit', handleReviewEditSubmit);
+    existing.remove();
+  }
+  activeEditReviewId = null;
+};
+
+const handleReviewDelete = async (reviewId) => {
+  if (!authToken || !reviewId) {
+    setFeedback(reviewFeedback, 'Vous devez être connecté pour supprimer un avis.', true);
+    return;
+  }
+
+  if (!window.confirm('Confirmez-vous la suppression de cet avis ?')) {
+    return;
+  }
+
+  try {
+    await fetchJson(`/reviews/${reviewId}`, { method: 'DELETE' }, { requiresAuth: true });
+    currentDetailReviewId = null;
+    highlightedReviewId = null;
+    activeEditReviewId = null;
+    hideReviewDetail();
+    showGlobalMessage('Avis supprimé avec succès.');
+    await loadFeed();
+    await loadProfile();
+  } catch (error) {
+    setFeedback(reviewFeedback, error.message || 'Impossible de supprimer cet avis.', true);
+  }
+};
+
+const handlePhotoDelete = async (photoId) => {
+  if (!authToken || !photoId || !currentDetailReviewId) {
+    showGlobalMessage('Impossible de supprimer cette photo pour le moment.', true);
+    return;
+  }
+
+  if (!window.confirm('Supprimer cette photo ?')) {
+    return;
+  }
+
+  try {
+    await fetchJson(`/photos/${photoId}`, { method: 'DELETE' }, { requiresAuth: true });
+    showGlobalMessage('Photo supprimée avec succès.');
+    await loadFeed();
+    await showReviewDetail(currentDetailReviewId);
+  } catch (error) {
+    showGlobalMessage(error.message || 'Impossible de supprimer la photo.', true);
+  }
+};
+
+const handleReviewEditStart = (review) => {
+  if (!canManageReview(review)) return;
+  removeReviewEditForm();
+  activeEditReviewId = review.id;
+
+  const form = document.createElement('form');
+  form.className = 'review-edit-form';
+  form.dataset.reviewId = review.id;
+
+  const titleField = document.createElement('label');
+  titleField.textContent = 'Titre';
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.name = 'title';
+  titleInput.required = true;
+  titleInput.minLength = 3;
+  titleInput.value = review.title || '';
+  titleField.appendChild(titleInput);
+
+  const ratingField = document.createElement('label');
+  ratingField.textContent = 'Note';
+  const ratingSelect = document.createElement('select');
+  ratingSelect.name = 'rating';
+  ratingSelect.required = true;
+  const ratingOptions = [
+    { value: '', label: 'Sélectionner' },
+    { value: '1', label: '1 - Peut mieux faire' },
+    { value: '2', label: '2 - En dessous des attentes' },
+    { value: '3', label: '3 - Bien' },
+    { value: '4', label: '4 - Superbe' },
+    { value: '5', label: '5 - Exceptionnel' },
+  ];
+  ratingOptions.forEach((option) => {
+    const opt = document.createElement('option');
+    opt.value = option.value;
+    opt.textContent = option.label;
+    if (String(review.rating) === option.value) {
+      opt.selected = true;
+    }
+    ratingSelect.appendChild(opt);
+  });
+  ratingField.appendChild(ratingSelect);
+
+  const contentField = document.createElement('label');
+  contentField.textContent = 'Avis';
+  const contentArea = document.createElement('textarea');
+  contentArea.name = 'content';
+  contentArea.rows = 4;
+  contentArea.required = true;
+  contentArea.minLength = 10;
+  contentArea.value = review.content || '';
+  contentField.appendChild(contentArea);
+
+  const visitField = document.createElement('label');
+  visitField.textContent = 'Date de visite';
+  const visitInput = document.createElement('input');
+  visitInput.type = 'date';
+  visitInput.name = 'visit_date';
+  if (review.visit_date) {
+    visitInput.value = review.visit_date;
+  }
+  visitField.appendChild(visitInput);
+
+  const actionsRow = document.createElement('div');
+  actionsRow.className = 'review-edit-actions';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'primary-btn';
+  saveBtn.textContent = 'Enregistrer';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'secondary-btn';
+  cancelBtn.textContent = 'Annuler';
+  cancelBtn.addEventListener('click', () => {
+    removeReviewEditForm();
+    showReviewDetail(review.id);
+  });
+  actionsRow.append(saveBtn, cancelBtn);
+
+  form.append(titleField, ratingField, contentField, visitField, actionsRow);
+  form.addEventListener('submit', handleReviewEditSubmit);
+
+  reviewDetailBody.appendChild(form);
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+};
+
+const handleReviewEditSubmit = async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const reviewId = form.dataset.reviewId;
+  if (!reviewId) return;
+
+  const formData = new FormData(form);
+  const payload = {};
+  formData.forEach((value, key) => {
+    payload[key] = typeof value === 'string' ? value.trim() : value;
+  });
+
+  const rating = Number(payload.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    setFeedback(reviewFeedback, 'Merci de sélectionner une note entre 1 et 5.', true);
+    return;
+  }
+
+  if (!payload.title || payload.title.length < 3) {
+    setFeedback(reviewFeedback, 'Le titre doit contenir au moins 3 caractères.', true);
+    return;
+  }
+
+  if (!payload.content || payload.content.length < 10) {
+    setFeedback(reviewFeedback, 'Votre avis doit contenir au moins 10 caractères.', true);
+    return;
+  }
+
+  const updateData = {
+    title: payload.title,
+    content: payload.content,
+    rating,
+  };
+
+  if (payload.visit_date) {
+    updateData.visit_date = payload.visit_date;
+  } else {
+    updateData.visit_date = null;
+  }
+
+  try {
+    setFeedback(reviewFeedback, 'Mise à jour de votre avis…');
+    await fetchJson(
+      `/reviews/${reviewId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      },
+      { requiresAuth: true }
+    );
+
+    removeReviewEditForm();
+    setFeedback(reviewFeedback, 'Avis mis à jour avec succès.');
+    await loadFeed();
+    await showReviewDetail(reviewId);
+  } catch (error) {
+    setFeedback(reviewFeedback, error.message || "Impossible de mettre à jour l'avis", true);
+  }
+};
+
 const renderReviewDetailContent = (review) => {
   if (!reviewDetailPanel || !reviewDetailBody) return;
   reviewDetailPanel.classList.remove('hidden');
   clearDetailPanel();
+  removeReviewEditForm();
 
   const place = review.place || {};
   const author = review.user?.username ? `Par ${review.user.username}` : 'Voyageur anonyme';
@@ -912,6 +1203,30 @@ const renderReviewDetailContent = (review) => {
 
   reviewDetailBody.append(hero, contentBlock, placeBlock);
 
+  if (photoForm?.review_id) {
+    photoForm.review_id.value = review.id || '';
+  }
+
+  if (canManageReview(review)) {
+    const actions = document.createElement('div');
+    actions.className = 'detail-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'secondary-btn';
+    editBtn.textContent = 'Modifier cet avis';
+    editBtn.addEventListener('click', () => handleReviewEditStart(review));
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'danger-btn';
+    deleteBtn.textContent = 'Supprimer cet avis';
+    deleteBtn.addEventListener('click', () => handleReviewDelete(review.id));
+
+    actions.append(editBtn, deleteBtn);
+    reviewDetailBody.appendChild(actions);
+  }
+
   const photos = Array.isArray(review.photos) ? review.photos.filter((photo) => photo?.file_url) : [];
   if (photos.length) {
     const gallery = document.createElement('div');
@@ -923,10 +1238,31 @@ const renderReviewDetailContent = (review) => {
       img.alt = photo.caption || `Photo de ${review.title || "l'avis"}`;
       img.loading = 'lazy';
       figure.appendChild(img);
+      const captionBlock = document.createElement('figcaption');
       if (photo.caption) {
-        const figcaption = document.createElement('figcaption');
-        figcaption.textContent = photo.caption;
-        figure.appendChild(figcaption);
+        const caption = document.createElement('span');
+        caption.textContent = photo.caption;
+        captionBlock.appendChild(caption);
+      }
+      if (photo.user?.username) {
+        const owner = document.createElement('span');
+        owner.className = 'photo-owner';
+        owner.textContent = `Partagée par ${photo.user.username}`;
+        captionBlock.appendChild(owner);
+      }
+      if (captionBlock.childNodes.length) {
+        figure.appendChild(captionBlock);
+      }
+      if (canManagePhoto(photo)) {
+        const photoActions = document.createElement('div');
+        photoActions.className = 'photo-actions';
+        const deletePhotoBtn = document.createElement('button');
+        deletePhotoBtn.type = 'button';
+        deletePhotoBtn.className = 'photo-delete-btn';
+        deletePhotoBtn.textContent = 'Supprimer';
+        deletePhotoBtn.addEventListener('click', () => handlePhotoDelete(photo.id));
+        photoActions.appendChild(deletePhotoBtn);
+        figure.appendChild(photoActions);
       }
       gallery.appendChild(figure);
     });
@@ -953,19 +1289,24 @@ const showReviewDetail = async (reviewId) => {
   }
   clearDetailPanel();
 
-  let review = lastReviews.find((item) => String(item.id) === String(reviewId));
-  if (!review) {
-    try {
-      const response = await fetchJson(`/reviews/${reviewId}`);
-      review = response?.data || response;
-    } catch (error) {
-      setFeedback(feedFeedback, error.message || 'Impossible de charger le détail de cet avis', true);
-      hideReviewDetail();
-      return;
-    }
-  }
+  try {
+    const response = await fetchJson(`/reviews/${reviewId}`);
+    const review = response?.data || response;
 
-  renderReviewDetailContent(review);
+    if (!review) {
+      throw new Error('Avis introuvable');
+    }
+
+    const index = lastReviews.findIndex((item) => String(item.id) === String(reviewId));
+    if (index !== -1) {
+      lastReviews[index] = review;
+    }
+
+    renderReviewDetailContent(review);
+  } catch (error) {
+    setFeedback(feedFeedback, error.message || 'Impossible de charger le détail de cet avis', true);
+    hideReviewDetail();
+  }
 };
 
 const loadFeed = async (query = {}) => {
@@ -1007,15 +1348,32 @@ const loadProfile = async () => {
   }
 };
 
-const saveAuthState = (token, user) => {
-  authToken = token;
+const saveAuthState = (token, user, refresh, { silent = false } = {}) => {
+  authToken = token || null;
   currentUser = user || null;
+
   if (token) {
     safeStorageSet('naya-token', token);
   } else {
     safeStorageRemove('naya-token');
   }
-  updateLayoutForAuth();
+
+  if (refresh !== undefined) {
+    refreshToken = refresh || null;
+    if (refreshToken) {
+      safeStorageSet(REFRESH_TOKEN_KEY, refreshToken);
+    } else {
+      safeStorageRemove(REFRESH_TOKEN_KEY);
+    }
+  }
+
+  if (!silent) {
+    updateLayoutForAuth();
+  }
+};
+
+const clearAuthState = () => {
+  saveAuthState(null, null, null);
 };
 
 const updateLayoutForAuth = () => {
@@ -1042,6 +1400,12 @@ const showView = (viewId) => {
     const isActive = button.dataset.target === viewId;
     button.classList.toggle('active', isActive);
   });
+
+  if (viewId === 'map-view') {
+    const source = mapReviews.length ? mapReviews : lastReviews;
+    renderMapFeed(source);
+    setMapFeedback('');
+  }
 };
 
 const handleThemeToggle = () => {
@@ -1065,7 +1429,7 @@ const handleLogin = async (event) => {
       body: JSON.stringify(payload),
     });
 
-    saveAuthState(data.access_token, data.user);
+    saveAuthState(data.access_token, data.user, data.refresh_token);
     setFeedback(authFeedback, 'Ravi de vous revoir ! Redirection vers votre fil.');
     loginForm.reset();
   } catch (error) {
@@ -1115,6 +1479,35 @@ const handleSearch = (event) => {
   if (term && mapFrame) {
     const query = encodeURIComponent(term);
     mapFrame.src = `https://maps.google.com/maps?q=${query}&z=6&output=embed`;
+  }
+};
+
+const handleMapSearch = async (event) => {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!mapSearchInput) return;
+
+  const term = mapSearchInput.value.trim();
+  if (!term) {
+    setMapFeedback('Indiquez un mot-clé pour la recherche.', true);
+    return;
+  }
+
+  try {
+    setMapFeedback('Recherche en cours…');
+    const data = await fetchJson(`/reviews${buildQueryString({ search: term })}`);
+    const results = data.reviews || [];
+    renderMapFeed(results);
+    if (results.length) {
+      setMapFeedback(`${results.length} avis trouvé(s).`);
+      highlightOnMap(results[0]);
+      await showReviewDetail(results[0].id);
+    } else {
+      setMapFeedback('Aucun avis trouvé pour ce mot-clé.', true);
+    }
+  } catch (error) {
+    setMapFeedback(error.message || 'Impossible de lancer la recherche.', true);
   }
 };
 
@@ -1298,14 +1691,14 @@ const handleDeactivate = async (event) => {
     }, { requiresAuth: true });
 
     setFeedback(profileFeedback, result.message || 'Compte désactivé.');
-    saveAuthState(null, null);
+    clearAuthState();
   } catch (error) {
     setFeedback(profileFeedback, error.message || 'Impossible de désactiver le compte', true);
   }
 };
 
 const handleLogout = () => {
-  saveAuthState(null, null);
+  clearAuthState();
   setFeedback(authFeedback, 'Vous êtes déconnecté. À très vite !');
 };
 
@@ -1366,6 +1759,9 @@ const initEventListeners = () => {
   }
   if (themeToggle) {
     themeToggle.addEventListener('click', handleThemeToggle);
+  }
+  if (mapSearchForm) {
+    mapSearchForm.addEventListener('submit', handleMapSearch);
   }
 };
 

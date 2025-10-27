@@ -363,6 +363,20 @@
           </div>
         </div>
 
+        <div class="map-controls" data-animate>
+          <form id="map-search-form" class="map-search" role="search">
+            <label class="sr-only" for="map-search-input">Rechercher sur la carte</label>
+            <input
+              id="map-search-input"
+              type="search"
+              name="map-search"
+              placeholder="Rechercher par ville, pays, activité..."
+            />
+            <button type="submit" class="secondary-btn">Rechercher</button>
+          </form>
+          <p id="map-search-feedback" class="feedback" role="status"></p>
+        </div>
+
         <div class="map-layout" data-animate>
           <div class="map-wrapper" aria-label="Carte des expériences">
             <iframe
@@ -372,14 +386,10 @@
               loading="lazy"
               referrerpolicy="no-referrer-when-downgrade"
             ></iframe>
-            <div class="map-overlay">
-              <h3>Carte des aventures</h3>
-              <p>Sélectionnez un avis dans le fil ou recherchez une destination pour mettre à jour la carte.</p>
-            </div>
           </div>
 
-          <aside class="map-feed" aria-label="Derniers avis géolocalisés">
-            <h3>Derniers avis</h3>
+          <aside class="map-feed" aria-label="Avis géolocalisés">
+            <h3>Points d'intérêt</h3>
             <p class="subtitle">Cliquez sur un avis pour centrer la carte.</p>
             <ul id="map-feed-list" class="map-feed-list"></ul>
           </aside>

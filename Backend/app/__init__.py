@@ -3,7 +3,10 @@
 NAYA Travel Journal - Flask Application
 """
 
+import logging
 import os
+
+from logging.config import dictConfig
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -29,6 +32,8 @@ def create_app(config_object='config.Config'):
     db.init_app(app)
     jwt.init_app(app)
     CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+    _configure_logging(app)
     
     # Register API routes
     from app.api.v1 import api_v1
@@ -151,3 +156,18 @@ def _ensure_default_admin(app):
     db.session.add(user)
     db.session.commit()
     app.logger.info('Provisioned default admin account %s', admin_email)
+
+
+def _configure_logging(app):
+    """Configure application logging using app config or defaults."""
+    log_level = app.config.get('LOG_LEVEL', 'INFO').upper()
+    log_config = app.config.get('LOGGING', None)
+
+    if log_config:
+        dictConfig(log_config)
+        return
+
+    logging.basicConfig(
+        level=getattr(logging, log_level, logging.INFO),
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    )

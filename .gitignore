@@ -3,10 +3,12 @@
 # Don't track environment files
 Backend/.env
 Backend/naya.db
+Backend/instance/*.db
 
 # Don't track uploads directory contents
 Backend/uploads/*
 !Backend/uploads/.gitkeep
+Backend/app/uploads/
 
 # Don't track Python cache
 Backend/__pycache__/

@@ -4,7 +4,7 @@ Authentication API endpoints
 """
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 from app.services.auth import AuthService
 
 auth_bp = Blueprint('auth', __name__)
@@ -135,6 +135,15 @@ def get_user_stats():
         return jsonify({"error": str(e)}), 404
     except Exception as e:
         return jsonify({"error": "Failed to get user stats"}), 500
+
+
+@auth_bp.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh_token():
+    """Issue a new access token using a refresh token."""
+    identity = get_jwt_identity()
+    new_access_token = create_access_token(identity=identity)
+    return jsonify({'access_token': new_access_token}), 200
 
 @auth_bp.errorhandler(400)
 def bad_request(error):

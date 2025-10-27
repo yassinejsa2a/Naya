@@ -55,7 +55,7 @@ class SQLAlchemyRepository(BaseRepository):
     def get(self, obj_id: str) -> Optional[Any]:
         """Get object by ID"""
         try:
-            return self.model_class.query.get(obj_id)
+            return db.session.get(self.model_class, obj_id)
         except Exception:
             return None
     

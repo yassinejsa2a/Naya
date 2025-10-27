@@ -3,18 +3,23 @@
 Base Model for NAYA Travel Journal
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import uuid
 
 from app import db
+
+
+def _utcnow():
+    """Return a timezone-aware UTC timestamp."""
+    return datetime.now(timezone.utc)
 
 class BaseModel(db.Model):
     """Base class for all models"""
     __abstract__ = True
     
     id = db.Column(db.String(60), primary_key=True, default=lambda: str(uuid.uuid4()))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
     
     def __init__(self, *args, **kwargs):
         if kwargs:
@@ -26,12 +31,12 @@ class BaseModel(db.Model):
                     setattr(self, key, value)
         else:
             self.id = str(uuid.uuid4())
-            self.created_at = datetime.utcnow()
-            self.updated_at = datetime.utcnow()
+            self.created_at = _utcnow()
+            self.updated_at = _utcnow()
     
     def save(self):
         """Save to database"""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utcnow()
         db.session.add(self)
         db.session.commit()
     
@@ -59,7 +64,7 @@ class BaseModel(db.Model):
         for key, value in kwargs.items():
             if hasattr(self, key) and key not in ['id', 'created_at']:
                 setattr(self, key, value)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = _utcnow()
         db.session.commit()
     
     def __str__(self):

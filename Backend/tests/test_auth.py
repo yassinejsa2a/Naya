@@ -99,6 +99,31 @@ def test_login_success(client, sample_user):
     assert result['user']['is_admin'] is False
 
 
+def test_refresh_token(client, sample_user):
+    """Test refresh token returns a new access token."""
+    login_resp = client.post('/api/v1/auth/login', json={'login': 'test@example.com', 'password': 'password123'})
+    tokens = login_resp.get_json()
+    refresh = tokens['refresh_token']
+
+    response = client.post('/api/v1/auth/refresh', headers={'Authorization': f'Bearer {refresh}'})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert 'access_token' in payload
+    assert isinstance(payload['access_token'], str)
+
+
+def test_refresh_rejects_access_tokens(client, sample_user):
+    """Refreshing with an access token should fail with an error from JWT."""
+    login_resp = client.post('/api/v1/auth/login', json={'login': 'test@example.com', 'password': 'password123'})
+    access_token = login_resp.get_json()['access_token']
+
+    response = client.post('/api/v1/auth/refresh', headers={'Authorization': f'Bearer {access_token}'})
+    assert response.status_code in (401, 422)
+    payload = response.get_json()
+    assert any(key in payload for key in ('msg', 'error'))
+
+
 def test_register_admin_user(client):
     """Admin emails should receive admin privileges."""
     data = {
