@@ -1,0 +1,159 @@
+/* Reveal animations */
+
+[data-animate] {
+  opacity: 0;
+  transform: translateY(24px) scale(0.99);
+  transition: opacity 420ms ease, transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-animate].is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  [data-animate] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Dark mode refinements */
+
+[data-theme='dark'] .nav-btn,
+[data-theme='dark'] .subtitle,
+[data-theme='dark'] .api-controls,
+[data-theme='dark'] .feedback {
+  color: var(--color-muted);
+}
+
+[data-theme='dark'] .nav-btn.active {
+  color: var(--color-inverse);
+}
+
+[data-theme='dark'] .icon-btn {
+  background: rgba(76, 139, 255, 0.14);
+  color: var(--color-inverse);
+}
+
+[data-theme='dark'] .map-wrapper iframe {
+  filter: saturate(1.05) contrast(1.1) brightness(0.9);
+}
+
+[data-theme='dark'] .review-card,
+[data-theme='dark'] .feed-panel,
+[data-theme='dark'] .review-detail,
+[data-theme='dark'] .card,
+[data-theme='dark'] .map-feed,
+[data-theme='dark'] .auth-card {
+  box-shadow: var(--color-shadow);
+}
+
+[data-theme='dark'] .profile-details div,
+[data-theme='dark'] .detail-place {
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+
+/* Responsive */
+
+@media (max-width: 1080px) {
+  .app-header {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .header-controls {
+    width: 100%;
+  }
+
+  .main-nav {
+    justify-content: flex-start;
+  }
+
+  .feed-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .review-detail {
+    position: relative;
+    top: auto;
+    max-height: none;
+  }
+
+  .map-layout {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+@media (max-width: 720px) {
+  .app-main {
+    padding-inline: clamp(1rem, 6vw, 1.5rem);
+  }
+
+  .app-header {
+    padding-inline: clamp(1rem, 6vw, 1.5rem);
+  }
+
+  .brand__logo {
+    letter-spacing: 0.24rem;
+  }
+
+  .hero-stats {
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+  }
+
+  .global-feedback {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 520px) {
+  .header-actions {
+    justify-content: flex-start;
+  }
+
+  .icon-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .nav-btn,
+  .nav-btn--secondary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Scrollbar styling */
+
+body {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 45%, transparent)
+    color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+
+body::-webkit-scrollbar {
+  width: 0.55rem;
+}
+
+body::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+
+body::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  border-radius: 999px;
+}

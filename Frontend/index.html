@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f62ff" />
+    <title>NAYA • Carnet de voyage moderne</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/feed.css" />
+    <link rel="stylesheet" href="css/profile.css" />
+    <link rel="stylesheet" href="css/map.css" />
+    <link rel="stylesheet" href="css/extras.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Aller au contenu principal</a>
+    <div class="app-background" aria-hidden="true"></div>
+
+    <!-- Header / Navigation -->
+    <header class="app-header" data-animate>
+      <div class="brand">
+        <div class="brand__logo">NAYA</div>
+        <p class="brand__tagline">Carnet de voyage pour explorateurs modernes</p>
+      </div>
+
+      <div class="header-controls">
+        <nav class="main-nav" aria-label="Navigation principale">
+          <button class="nav-btn" data-target="feed-view">Accueil</button>
+          <button class="nav-btn" data-target="add-review-view">Partager</button>
+          <button class="nav-btn" data-target="map-view">Carte</button>
+          <button class="nav-btn" data-target="profile-view">Profil</button>
+        </nav>
+
+        <div class="header-actions">
+          <button id="logout-btn" class="nav-btn nav-btn--secondary">Se déconnecter</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Global feedback -->
+    <div
+      id="global-feedback"
+      class="feedback global-feedback hidden"
+      role="status"
+      aria-live="polite"
+    ></div>
+
+    <main id="main-content" class="app-main">
+      <!-- Auth view -->
+      <section id="auth-view" class="view" data-animate>
+        <div class="auth-card">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="login" role="tab">Connexion</button>
+            <button class="tab" data-tab="register" role="tab">Créer un compte</button>
+          </div>
+
+          <form id="login-form" class="form" autocomplete="on">
+            <h2>Heureux de vous revoir</h2>
+            <label>
+              E-mail ou nom d'utilisateur
+              <input type="text" name="login" required />
+            </label>
+            <label>
+              Mot de passe
+              <input type="password" name="password" minlength="8" required />
+            </label>
+            <button type="submit" class="primary-btn">Se connecter</button>
+          </form>
+
+          <form id="register-form" class="form hidden" autocomplete="on">
+            <h2>Rejoindre la communauté</h2>
+            <div class="two-columns">
+              <label>
+                Nom d'utilisateur
+                <input type="text" name="username" minlength="3" required />
+              </label>
+              <label>
+                E-mail
+                <input type="email" name="email" required />
+              </label>
+            </div>
+            <label>
+              Mot de passe
+              <input type="password" name="password" minlength="8" required />
+            </label>
+            <label>
+              Confirmer le mot de passe
+              <input type="password" name="confirmPassword" minlength="8" required />
+            </label>
+            <p class="form-hint">
+              Votre mot de passe doit contenir au moins 8 caractères avec lettres et chiffres.
+            </p>
+            <button type="submit" class="primary-btn">Créer un compte</button>
+          </form>
+
+          <p id="auth-feedback" class="feedback" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <!-- Feed view -->
+      <section id="feed-view" class="view hidden" aria-label="Fil d'actualités" data-animate>
+        <div class="view-header" data-animate>
+          <div>
+            <h2>Fil des voyageurs</h2>
+            <p class="subtitle">Découvrez les expériences authentiques partagées par la communauté.</p>
+          </div>
+          <form id="search-form" class="search" role="search">
+            <label class="sr-only" for="search-input">Rechercher un avis</label>
+            <input
+              id="search-input"
+              type="search"
+              name="search"
+              placeholder="Rechercher par mot-clé, ville ou activité"
+            />
+            <button type="submit" class="secondary-btn">Rechercher</button>
+          </form>
+        </div>
+
+        <section class="feed-hero" aria-label="Mise en avant NAYA" data-animate>
+          <div class="hero-content">
+            <h3>Des carnets inspirants</h3>
+            <p>
+              Parcourez les récits détaillés des membres et trouvez l'inspiration pour votre prochaine
+              échappée.
+            </p>
+          </div>
+          <div class="hero-stats">
+            <div>
+              <span class="stat-value" id="hero-review-count">0</span>
+              <span class="stat-label">avis partagés</span>
+            </div>
+            <div>
+              <span class="stat-value" id="hero-destinations">—</span>
+              <span class="stat-label">destinations à explorer</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="feed-layout" aria-live="polite">
+          <div class="feed-panel" data-animate>
+            <ul id="reviews-list" class="reviews"></ul>
+            <p id="feed-feedback" class="feedback" role="status"></p>
+          </div>
+
+          <aside id="review-detail" class="review-detail hidden" aria-live="polite" data-animate>
+            <div class="review-detail__header">
+              <div>
+                <h3 id="detail-title">Sélectionnez un avis</h3>
+                <p id="detail-meta" class="detail-meta">Explorez un avis pour afficher ses détails.</p>
+              </div>
+              <button id="close-detail-btn" type="button" class="icon-btn" aria-label="Fermer les détails">
+                ✕
+              </button>
+            </div>
+            <div id="detail-content" class="review-detail__body">
+              <p class="detail-placeholder">
+                Cliquez sur un avis pour afficher sa description, sa note, ses photos et les informations du
+                lieu.
+              </p>
+            </div>
+          </aside>
+        </section>
+      </section>
+
+      <!-- Add review view -->
+      <section id="add-review-view" class="view hidden" aria-label="Ajouter un avis" data-animate>
+        <div class="view-header">
+          <div>
+            <h2>Partager une nouvelle expérience</h2>
+            <p class="subtitle">Inspirez d'autres voyageurs avec les lieux qui vous ont marqué.</p>
+          </div>
+        </div>
+
+        <form id="review-form" class="form card" data-animate enctype="multipart/form-data">
+          <div class="two-columns">
+            <label>
+              Titre
+              <input type="text" name="title" minlength="3" required />
+            </label>
+            <label>
+              Note
+              <select name="rating" required>
+                <option value="">Sélectionner</option>
+                <option value="1">1 - Peut mieux faire</option>
+                <option value="2">2 - En dessous des attentes</option>
+                <option value="3">3 - Bien</option>
+                <option value="4">4 - Superbe</option>
+                <option value="5">5 - Exceptionnel</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Nom du lieu
+            <input
+              type="text"
+              name="place_name"
+              placeholder="Ex. Jardin Majorelle"
+            />
+          </label>
+
+          <div class="two-columns">
+            <label>
+              Ville
+              <input
+                type="text"
+                name="place_city"
+                placeholder="Ville du lieu"
+              />
+            </label>
+            <label>
+              Pays
+              <input
+                type="text"
+                name="place_country"
+                placeholder="Pays du lieu"
+              />
+            </label>
+          </div>
+
+          <label>
+            Description du lieu (optionnel)
+            <input
+              type="text"
+              name="place_description"
+              placeholder="Quartier, ambiance, conseils pratiques…"
+            />
+          </label>
+
+          <p class="form-hint">
+            Indiquez le nom, la ville et le pays pour créer un nouveau lieu.
+          </p>
+
+          <label>
+            Avis
+            <textarea
+              name="content"
+              rows="6"
+              minlength="10"
+              placeholder="Partagez vos conseils, coups de cœur et recommandations"
+              required
+            ></textarea>
+          </label>
+
+          <label>
+            Date de visite
+            <input type="date" name="visit_date" />
+          </label>
+
+          <div class="form-divider" aria-hidden="true"></div>
+
+          <h3>Ajouter une photo (optionnel)</h3>
+          <p class="subtitle">
+            Joignez une photo à votre récit pour faire voyager la communauté.
+          </p>
+          <label>
+            Photo
+            <input
+              type="file"
+              name="photo_file"
+              accept="image/*"
+            />
+          </label>
+          <label>
+            Légende (optionnel)
+            <input
+              type="text"
+              name="caption"
+              placeholder="Décrivez le moment"
+            />
+          </label>
+
+          <button type="submit" class="primary-btn">Publier l'expérience</button>
+          <p id="review-feedback" class="feedback" role="status"></p>
+        </form>
+      </section>
+
+      <!-- Profile view -->
+      <section id="profile-view" class="view hidden" aria-label="Profil" data-animate>
+        <div class="view-header">
+          <div>
+            <h2>Votre profil</h2>
+            <p class="subtitle">Gérez vos informations et suivez vos contributions.</p>
+          </div>
+        </div>
+
+        <section class="card profile-card" data-animate>
+          <div class="profile-avatar">
+            <img id="profile-avatar" src="" alt="Photo de profil" class="profile-avatar__image" />
+          </div>
+          <dl class="profile-details">
+            <div>
+              <dt>Nom d'utilisateur</dt>
+              <dd id="profile-username">—</dd>
+            </div>
+            <div>
+              <dt>E-mail</dt>
+              <dd id="profile-email">—</dd>
+            </div>
+            <div>
+              <dt>Membre depuis</dt>
+              <dd id="profile-created">—</dd>
+            </div>
+            <div>
+              <dt>Total des avis</dt>
+              <dd id="profile-review-count">0</dd>
+            </div>
+          </dl>
+
+          <form id="profile-form" class="form" data-animate>
+            <h3>Mettre à jour le profil</h3>
+            <div class="profile-controls">
+              <button id="profile-theme-toggle" class="icon-toggle" type="button">
+                <span class="icon-toggle__icon">🌙</span>
+                <span class="icon-toggle__label">Mode sombre</span>
+              </button>
+            </div>
+            <div class="two-columns">
+              <label>
+                Nom d'utilisateur
+                <input type="text" name="username" minlength="3" required />
+              </label>
+              <label>
+                Biographie
+                <textarea
+                  name="bio"
+                  rows="3"
+                  placeholder="Décrivez brièvement votre façon de voyager"
+                ></textarea>
+              </label>
+            </div>
+            <button type="submit" class="secondary-btn">Enregistrer les modifications</button>
+          </form>
+
+          <form id="profile-photo-form" class="form" data-animate enctype="multipart/form-data">
+            <h3>Mettre à jour la photo de profil</h3>
+            <label>
+              Choisir une photo
+              <input type="file" name="avatar" accept="image/*" required />
+            </label>
+            <button type="submit" class="secondary-btn">Téléverser</button>
+          </form>
+
+          <form id="password-form" class="form" data-animate>
+            <h3>Modifier le mot de passe</h3>
+            <label>
+              Mot de passe actuel
+              <input type="password" name="old_password" required />
+            </label>
+            <label>
+              Nouveau mot de passe
+              <input type="password" name="new_password" minlength="8" required />
+            </label>
+            <button type="submit" class="secondary-btn">Mettre à jour</button>
+          </form>
+
+          <form id="deactivate-form" class="form danger-zone" data-animate>
+            <h3>Désactiver le compte</h3>
+            <p class="subtitle">
+              Cette action désactive votre compte. Vous pourrez le réactiver plus tard en contactant l'équipe
+              NAYA.
+            </p>
+            <button type="submit" class="danger-btn">Désactiver</button>
+          </form>
+
+          <p id="profile-feedback" class="feedback" role="status"></p>
+        </section>
+
+        <section class="card posted-card" data-animate>
+          <div class="liked-card__header">
+            <h3>Vos avis publiés</h3>
+            <span id="posted-reviews-count" class="badge">0</span>
+          </div>
+          <p class="subtitle">
+            Consultez rapidement les expériences que vous avez partagées.
+          </p>
+          <ul id="posted-reviews-list" class="reviews reviews--compact"></ul>
+          <p id="posted-reviews-feedback" class="feedback" role="status"></p>
+        </section>
+
+        <section class="card liked-card" data-animate>
+          <div class="liked-card__header">
+            <h3>Vos avis aimés</h3>
+            <span id="liked-reviews-count" class="badge">0</span>
+          </div>
+          <p class="subtitle">
+            Retrouvez en un clin d'œil les publications que vous avez appréciées.
+          </p>
+          <ul id="liked-reviews-list" class="reviews reviews--compact"></ul>
+          <p id="liked-reviews-feedback" class="feedback" role="status"></p>
+        </section>
+      </section>
+
+      <!-- Public profile view -->
+      <section id="public-profile-view" class="view hidden" aria-label="Profil voyageur" data-animate>
+        <div class="view-header">
+          <div>
+            <h2 id="public-profile-title">Profil du voyageur</h2>
+            <p id="public-profile-subtitle" class="subtitle">
+              Découvrez les histoires partagées par ce membre de la communauté.
+            </p>
+          </div>
+          <button id="public-profile-back" type="button" class="secondary-btn">Retour au fil</button>
+        </div>
+
+        <section class="card profile-card" data-animate>
+          <div class="profile-avatar">
+            <img
+              id="public-profile-avatar"
+              src=""
+              alt="Photo de profil du voyageur"
+              class="profile-avatar__image"
+            />
+          </div>
+          <dl class="profile-details">
+            <div>
+              <dt>Nom d'utilisateur</dt>
+              <dd id="public-profile-username">—</dd>
+            </div>
+            <div>
+              <dt>Biographie</dt>
+              <dd id="public-profile-bio">Aucune biographie renseignée.</dd>
+            </div>
+            <div>
+              <dt>Membre depuis</dt>
+              <dd id="public-profile-created">—</dd>
+            </div>
+            <div>
+              <dt>Contributions</dt>
+              <dd>
+                <span id="public-profile-reviews-count">0</span> avis ·
+                <span id="public-profile-photos-count">0</span> photos
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card" data-animate>
+          <div>
+            <h3>Avis publiés</h3>
+          </div>
+          <ul id="public-profile-reviews" class="reviews"></ul>
+          <p id="public-profile-feedback" class="feedback" role="status"></p>
+        </section>
+      </section>
+
+      <!-- Map view -->
+      <section id="map-view" class="view hidden" aria-label="Carte interactive" data-animate>
+        <div class="view-header">
+          <div>
+            <h2>Explorer la carte</h2>
+            <p class="subtitle">
+              Visualisez les expériences partagées sur une carte immersive et trouvez l'étape parfaite.
+            </p>
+          </div>
+        </div>
+
+        <div class="map-controls" data-animate>
+          <form id="map-search-form" class="map-search" role="search">
+            <label class="sr-only" for="map-search-input">Rechercher sur la carte</label>
+            <input
+              id="map-search-input"
+              type="search"
+              name="map-search"
+              placeholder="Rechercher par ville, pays, activité..."
+            />
+            <button type="submit" class="secondary-btn">Rechercher</button>
+          </form>
+          <p id="map-search-feedback" class="feedback" role="status"></p>
+        </div>
+
+        <div class="map-layout" data-animate>
+          <div class="map-wrapper" aria-label="Carte des expériences">
+            <iframe
+              id="map-frame"
+              title="Lieux mis en avant"
+              src="https://maps.google.com/maps?q=paris&t=&z=5&ie=UTF8&iwloc=&output=embed"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
+          </div>
+
+          <aside class="map-feed" aria-label="Avis géolocalisés">
+            <h3>Points d'intérêt</h3>
+            <p class="subtitle">Cliquez sur un avis pour centrer la carte.</p>
+            <ul id="map-feed-list" class="map-feed-list"></ul>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer" data-animate>
+      <div>
+        <p>© <span id="year"></span> NAYA. Créé pour les explorateurs du monde entier.</p>
+        <p class="subtitle">Une application pensée pour la découverte, la confiance et l'inspiration.</p>
+      </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/core.js" defer></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/reviews.js" defer></script>
+    <script src="js/profile.js" defer></script>
+    <script src="js/handlers.js" defer></script>
+    <script src="js/init.js" defer></script>
+  </body>
+</html>
