@@ -1052,7 +1052,7 @@ iframe {
   font-size: 0.85rem;
 }
 
-.liked-card {
+.liked-card, .posted-card {
   margin-top: 2rem;
   display: grid;
   gap: 1rem;

@@ -32,6 +32,9 @@ const publicProfilePhotosCount = document.getElementById('public-profile-photos-
 const publicProfileBackBtn = document.getElementById('public-profile-back');
 const publicProfileTitle = document.getElementById('public-profile-title');
 const publicProfileSubtitle = document.getElementById('public-profile-subtitle');
+const postedReviewsList = document.getElementById('posted-reviews-list');
+const postedReviewsCount = document.getElementById('posted-reviews-count');
+const postedReviewsFeedback = document.getElementById('posted-reviews-feedback');
 const likedReviewsList = document.getElementById('liked-reviews-list');
 const likedReviewsCount = document.getElementById('liked-reviews-count');
 const likedReviewsFeedback = document.getElementById('liked-reviews-feedback');
@@ -345,6 +348,7 @@ let lastCreatedReviewId = null;
 let activeEditReviewId = null;
 let publicProfileUserId = null;
 let publicProfileReviews = [];
+let postedReviews = [];
 let likedReviews = [];
 let likedReviewsTotal = 0;
 const likedReviewIds = new Set();
@@ -509,7 +513,7 @@ const buildPlaceCacheKey = (name, city, country) =>
     '::'
   );
 
-const reviewCollections = () => [lastReviews, mapReviews, publicProfileReviews, likedReviews];
+const reviewCollections = () => [lastReviews, mapReviews, publicProfileReviews, postedReviews, likedReviews];
 
 const updateReviewCollections = (reviewId, transformer) => {
   const id = String(reviewId);
@@ -1249,6 +1253,30 @@ const refreshLikedReviewsUI = () => {
   likedReviewsList.appendChild(fragment);
 };
 
+const refreshPostedReviewsUI = () => {
+  if (!postedReviewsList || !postedReviewsCount) return;
+  postedReviewsCount.textContent = postedReviews.length.toLocaleString('fr-FR');
+  postedReviewsList.innerHTML = '';
+
+  if (!postedReviews.length) {
+    if (postedReviewsFeedback) {
+      postedReviewsFeedback.textContent = "Vous n'avez pas encore publié d'avis.";
+    }
+    return;
+  }
+
+  if (postedReviewsFeedback) {
+    postedReviewsFeedback.textContent = '';
+  }
+
+  const fragment = document.createDocumentFragment();
+  postedReviews.slice(0, 20).forEach((review) => {
+    const card = createReviewCard(review, { interactive: false, compact: true });
+    fragment.appendChild(card);
+  });
+  postedReviewsList.appendChild(fragment);
+};
+
 const reconcileLikedStateAcrossCollections = () => {
   const ids = new Set(Array.from(likedReviewIds, (value) => String(value)));
   reviewCollections().forEach((collection) => {
@@ -1353,6 +1381,7 @@ const ensureLikedReviewsFromProfile = (likedPayload = [], total = null) => {
     }
   });
   reconcileLikedStateAcrossCollections();
+  refreshPostedReviewsUI();
   refreshLikedReviewsUI();
 };
 
@@ -2050,7 +2079,11 @@ const loadFeed = async (query = {}) => {
 const loadProfile = async () => {
   if (!authToken) return;
   try {
-    const [profile, stats] = await Promise.all([api.auth.profile(), api.auth.stats()]);
+    const [profile, stats, reviewsResponse] = await Promise.all([
+      api.auth.profile(),
+      api.auth.stats(),
+      api.reviews.list({ user_id: currentUser?.id || 'me', limit: 50 }, { includeAuth: true }),
+    ]);
 
     currentUser = profile;
     profileUsername.textContent = profile.username || 'Voyageur';
@@ -2065,6 +2098,13 @@ const loadProfile = async () => {
       const liked = likedReviewIds.has(String(review.id));
       updateLikeButtonsInDOM(review.id, review.likes_count ?? 0, liked);
     });
+
+    postedReviews = Array.isArray(reviewsResponse?.reviews) && reviewsResponse.reviews.length
+      ? [...reviewsResponse.reviews]
+      : Array.isArray(profile.reviews)
+      ? profile.reviews
+      : [];
+    refreshPostedReviewsUI();
 
     profileForm.username.value = profile.username || '';
     profileForm.bio.value = profile.bio || '';
@@ -2099,7 +2139,8 @@ const showPublicProfile = async (userId) => {
       api.reviews.list({ user_id: userId, limit: 50 }),
     ]);
 
-    const profile = profilePayload?.user || profilePayload;
+    const profileData = profilePayload?.user || profilePayload;
+    const profile = { ...profileData, reviews: profileData?.reviews || [] };
     if (!profile) {
       throw new Error('Profil introuvable');
     }
