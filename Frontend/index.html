@@ -13,7 +13,12 @@
       rel="stylesheet"
     />
     <!-- Styles -->
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/feed.css" />
+    <link rel="stylesheet" href="css/profile.css" />
+    <link rel="stylesheet" href="css/map.css" />
+    <link rel="stylesheet" href="css/extras.css" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Aller au contenu principal</a>
@@ -312,6 +317,12 @@
 
           <form id="profile-form" class="form" data-animate>
             <h3>Mettre à jour le profil</h3>
+            <div class="profile-controls">
+              <button id="profile-theme-toggle" class="icon-toggle" type="button">
+                <span class="icon-toggle__icon">🌙</span>
+                <span class="icon-toggle__label">Mode sombre</span>
+              </button>
+            </div>
             <div class="two-columns">
               <label>
                 Nom d'utilisateur
@@ -495,6 +506,11 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="app.js" defer></script>
+    <script src="js/core.js" defer></script>
+    <script src="js/api.js" defer></script>
+    <script src="js/reviews.js" defer></script>
+    <script src="js/profile.js" defer></script>
+    <script src="js/handlers.js" defer></script>
+    <script src="js/init.js" defer></script>
   </body>
 </html>
