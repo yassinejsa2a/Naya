@@ -8,9 +8,13 @@ from typing import List, Optional, Dict, Any
 
 from app.models.place import Place
 from app.models.review import Review
+from app.models.review_like import ReviewLike
+from app.models.review_comment import ReviewComment
 from app.repositories.review_repository import ReviewRepository
 from app.repositories.place_repository import PlaceRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.like_repository import ReviewLikeRepository
+from app.repositories.comment_repository import ReviewCommentRepository
 from app.services.photo_service import PhotoService
 
 class ReviewService:
@@ -21,6 +25,59 @@ class ReviewService:
         self.place_repository = PlaceRepository()
         self.user_repository = UserRepository()
         self.photo_service = PhotoService()
+        self.like_repository = ReviewLikeRepository()
+        self.comment_repository = ReviewCommentRepository()
+
+    def _serialize_comment(self, comment: ReviewComment) -> Dict[str, Any]:
+        """Serialize a review comment with author metadata."""
+        user = comment.user or self.user_repository.get(comment.user_id)
+        return {
+            'id': comment.id,
+            'content': comment.content,
+            'created_at': comment.created_at.isoformat() if comment.created_at else None,
+            'updated_at': comment.updated_at.isoformat() if comment.updated_at else None,
+            'user': user.to_public_dict() if user else None,
+        }
+
+    def _build_like_summary(self, review_id: str, current_user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return like summary payload for a review."""
+        likes_count = self.like_repository.count_for_review(review_id)
+        liked_by_user = False
+        if current_user_id:
+            liked_by_user = self.like_repository.get_by_user_and_review(current_user_id, review_id) is not None
+        return {
+            'review_id': review_id,
+            'likes_count': likes_count,
+            'liked_by_user': liked_by_user,
+        }
+
+    def _serialize_review(
+        self,
+        review: Review,
+        current_user_id: Optional[str] = None,
+        include_comments: bool = False,
+        comments_limit: Optional[int] = None,
+        place: Optional[Place] = None,
+        user: Optional['User'] = None,
+    ) -> Dict[str, Any]:
+        """Serialize a review with related data and aggregates."""
+        review_data = review.to_dict()
+
+        user_obj = user or review.author or self.user_repository.get(review.user_id)
+        place_obj = place or self.place_repository.get(review.place_id)
+
+        review_data['user'] = user_obj.to_public_dict() if user_obj else None
+        review_data['place'] = place_obj.to_dict() if place_obj else None
+        review_data['photos'] = self._get_photos_for_review(review.id)
+        review_data.update(self._build_like_summary(review.id, current_user_id))
+
+        review_data['comments_count'] = self.comment_repository.count_for_review(review.id)
+
+        if include_comments:
+            comments = self.comment_repository.list_for_review(review.id, comments_limit)
+            review_data['comments'] = [self._serialize_comment(comment) for comment in comments]
+
+        return review_data
     
     def create_review(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -126,7 +183,7 @@ class ReviewService:
         
         return {
             'message': 'Review created successfully',
-            'review': created_review.to_dict()
+            'review': self._serialize_review(created_review, current_user_id=review_payload['user_id'], include_comments=True)
         }
     
     def get_review(self, review_id: str) -> Dict[str, Any]:
@@ -223,7 +280,7 @@ class ReviewService:
         
         return {
             'message': 'Review updated successfully',
-            'review': updated_review.to_dict()
+            'review': self._serialize_review(updated_review, current_user_id=user_id, include_comments=True)
         }
     
     def delete_review(self, review_id: str, user_id: str) -> Dict[str, Any]:
@@ -258,92 +315,233 @@ class ReviewService:
             raise ValueError("Failed to delete review")
         
         return {'message': 'Review deleted successfully'}
+
+    def like_review(self, review_id: str, user_id: str) -> Dict[str, Any]:
+        """Register a like from a user on a review."""
+        review = self.review_repository.get(review_id)
+        if not review:
+            raise ValueError("Review not found")
+
+        user = self.user_repository.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        existing = self.like_repository.get_by_user_and_review(user_id, review_id)
+        if existing:
+            summary = self._build_like_summary(review_id, user_id)
+            summary['message'] = 'Review already liked'
+            return summary
+
+        like = ReviewLike(user_id=user_id, review_id=review_id)
+        self.like_repository.create(like)
+
+        summary = self._build_like_summary(review_id, user_id)
+        summary['message'] = 'Review liked successfully'
+        return summary
+
+    def unlike_review(self, review_id: str, user_id: str) -> Dict[str, Any]:
+        """Remove a like for a review by the given user."""
+        review = self.review_repository.get(review_id)
+        if not review:
+            raise ValueError("Review not found")
+
+        user = self.user_repository.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        existing = self.like_repository.get_by_user_and_review(user_id, review_id)
+        if existing:
+            self.like_repository.delete(existing.id)
+
+        summary = self._build_like_summary(review_id, user_id)
+        summary['message'] = 'Review unliked successfully' if existing else 'Review was not liked'
+        return summary
+
+    def get_review_likes(self, review_id: str, current_user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return like summary plus a short list of recent likers."""
+        review = self.review_repository.get(review_id)
+        if not review:
+            raise ValueError("Review not found")
+
+        likes = self.like_repository.get_likes_for_review(review_id)
+        users_preview: List[Dict[str, Any]] = []
+        for like in likes[:10]:
+            liker = like.user or self.user_repository.get(like.user_id)
+            if liker:
+                users_preview.append({
+                    'id': liker.id,
+                    'username': liker.username,
+                    'profile_photo_url': liker.profile_photo_url,
+                })
+
+        summary = self._build_like_summary(review_id, current_user_id)
+        summary['users'] = users_preview
+        return summary
+
+    def add_comment(self, review_id: str, user_id: str, content: str) -> Dict[str, Any]:
+        """Add a comment to a review."""
+        if not content or not content.strip():
+            raise ValueError("Comment content is required")
+
+        content = content.strip()
+        if len(content) < 2:
+            raise ValueError("Comment content is too short")
+
+        review = self.review_repository.get(review_id)
+        if not review:
+            raise ValueError("Review not found")
+
+        user = self.user_repository.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        comment = ReviewComment(content=content, user_id=user_id, review_id=review_id)
+        created_comment = self.comment_repository.create(comment)
+
+        return {
+            'message': 'Comment added successfully',
+            'comment': self._serialize_comment(created_comment),
+            'comments_count': self.comment_repository.count_for_review(review_id),
+        }
+
+    def delete_comment(self, review_id: str, comment_id: str, user_id: str) -> Dict[str, Any]:
+        """Delete a comment if the requester is owner or admin."""
+        review = self.review_repository.get(review_id)
+        if not review:
+            raise ValueError("Review not found")
+
+        user = self.user_repository.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        comment = self.comment_repository.get_by_id_for_review(comment_id, review_id)
+        if not comment:
+            raise ValueError("Comment not found")
+
+        if comment.user_id != user_id and not user.is_admin:
+            raise PermissionError("You can only delete your own comments")
+
+        deleted = self.comment_repository.delete(comment_id)
+        if not deleted:
+            raise ValueError("Failed to delete comment")
+
+        return {
+            'message': 'Comment deleted successfully',
+            'comments_count': self.comment_repository.count_for_review(review_id),
+        }
+
+    def list_comments(self, review_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Return comments for a given review."""
+        review = self.review_repository.get(review_id)
+        if not review:
+            raise ValueError("Review not found")
+
+        comments = self.comment_repository.list_for_review(review_id, limit)
+        return [self._serialize_comment(comment) for comment in comments]
+
+    def get_liked_reviews_for_user(self, user_id: str, limit: Optional[int] = None) -> Dict[str, Any]:
+        """Return reviews liked by the specified user."""
+        user = self.user_repository.get(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        review_ids = self.like_repository.list_review_ids_for_user(user_id)
+        total = len(review_ids)
+        if limit:
+            review_ids = review_ids[:limit]
+
+        liked_reviews: List[Dict[str, Any]] = []
+        for liked_review_id in review_ids:
+            review = self.review_repository.get(liked_review_id)
+            if review:
+                liked_reviews.append(self._serialize_review(review, current_user_id=user_id))
+
+        return {
+            'reviews': liked_reviews,
+            'total': total,
+        }
     
-    def get_reviews_by_place(self, place_id: str, limit: Optional[int] = 20) -> List[Dict[str, Any]]:
+    def get_reviews_by_place(
+        self,
+        place_id: str,
+        limit: Optional[int] = 20,
+        current_user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get reviews for a place
         Args:
             place_id (str): Place ID
             limit (int, optional): Limit results
+            current_user_id (str, optional): Current user for like context
         Returns:
             List of reviews with user data
         """
-        # Validate place exists
         place = self.place_repository.get(place_id)
         if not place:
             raise ValueError("Place not found")
         
         reviews = self.review_repository.get_by_place(place_id, limit)
-        result = []
-        
-        for review in reviews:
-            review_data = review.to_dict()
-            # Add user info (public only)
-            user = self.user_repository.get(review.user_id)
-            review_data['user'] = user.to_public_dict() if user else None
-            review_data['place'] = place.to_dict() if place else None
-            review_data['photos'] = self._get_photos_for_review(review.id)
-            result.append(review_data)
-        
-        return result
+        return [
+            self._serialize_review(review, current_user_id=current_user_id, place=place)
+            for review in reviews
+        ]
     
-    def get_reviews_by_user(self, user_id: str, limit: Optional[int] = 20) -> List[Dict[str, Any]]:
+    def get_reviews_by_user(
+        self,
+        user_id: str,
+        limit: Optional[int] = 20,
+        current_user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get reviews by user
         Args:
             user_id (str): User ID
             limit (int, optional): Limit results
+            current_user_id (str, optional): Current user for like context
         Returns:
             List of reviews with place data
         """
-        # Validate user exists
         user = self.user_repository.get(user_id)
         if not user:
             raise ValueError("User not found")
         
         reviews = self.review_repository.get_by_user(user_id, limit)
-        result = []
-        
-        for review in reviews:
-            review_data = review.to_dict()
-            # Add place info
-            place = self.place_repository.get(review.place_id)
-            review_data['place'] = place.to_dict() if place else None
-            review_data['photos'] = self._get_photos_for_review(review.id)
-            result.append(review_data)
-        
-        return result
+        return [
+            self._serialize_review(review, current_user_id=current_user_id)
+            for review in reviews
+        ]
     
-    def get_recent_reviews(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_reviews(
+        self,
+        limit: int = 10,
+        current_user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get recent reviews
         Args:
             limit (int): Number of reviews
+            current_user_id (str, optional): Current user for like context
         Returns:
             List of recent reviews with user and place data
         """
         reviews = self.review_repository.get_recent_reviews(limit)
-        result = []
-        
-        for review in reviews:
-            review_data = review.to_dict()
-            # Add user and place info
-            user = self.user_repository.get(review.user_id)
-            place = self.place_repository.get(review.place_id)
-            
-            review_data['user'] = user.to_public_dict() if user else None
-            review_data['place'] = place.to_dict() if place else None
-            review_data['photos'] = self._get_photos_for_review(review.id)
-            result.append(review_data)
-        
-        return result
+        return [
+            self._serialize_review(review, current_user_id=current_user_id)
+            for review in reviews
+        ]
     
-    def search_reviews(self, search_term: str, limit: Optional[int] = 20) -> List[Dict[str, Any]]:
+    def search_reviews(
+        self,
+        search_term: str,
+        limit: Optional[int] = 20,
+        current_user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Search reviews
         Args:
             search_term (str): Search term
             limit (int, optional): Limit results
+            current_user_id (str, optional): Current user for like context
         Returns:
             List of matching reviews
         """
@@ -351,20 +549,10 @@ class ReviewService:
             return []
         
         reviews = self.review_repository.search_reviews(search_term.strip(), limit)
-        result = []
-        
-        for review in reviews:
-            review_data = review.to_dict()
-            # Add user and place info
-            user = self.user_repository.get(review.user_id)
-            place = self.place_repository.get(review.place_id)
-            
-            review_data['user'] = user.to_public_dict() if user else None
-            review_data['place'] = place.to_dict() if place else None
-            review_data['photos'] = self._get_photos_for_review(review.id)
-            result.append(review_data)
-        
-        return result
+        return [
+            self._serialize_review(review, current_user_id=current_user_id)
+            for review in reviews
+        ]
     
     def get_review_statistics(self, place_id: str) -> Dict[str, Any]:
         """
@@ -389,11 +577,20 @@ class ReviewService:
         
         return stats
     
-    def get_review_by_id(self, review_id: str) -> Optional[Dict[str, Any]]:
+    def get_review_by_id(
+        self,
+        review_id: str,
+        current_user_id: Optional[str] = None,
+        include_comments: bool = True,
+        comments_limit: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
         Get review by ID with user and place info
         Args:
             review_id (str): Review ID
+            current_user_id (str, optional): Current user for like context
+            include_comments (bool): Include comment list
+            comments_limit (int, optional): Limit for comments
         Returns:
             dict or None: Review data with user and place info
         """
@@ -401,17 +598,12 @@ class ReviewService:
         if not review:
             return None
         
-        review_data = review.to_dict()
-        
-        # Add user and place info
-        user = self.user_repository.get(review.user_id)
-        place = self.place_repository.get(review.place_id)
-        
-        review_data['user'] = user.to_public_dict() if user else None
-        review_data['place'] = place.to_dict() if place else None
-        review_data['photos'] = self._get_photos_for_review(review.id)
-        
-        return review_data
+        return self._serialize_review(
+            review,
+            current_user_id=current_user_id,
+            include_comments=include_comments,
+            comments_limit=comments_limit,
+        )
     
     def get_place_statistics(self, place_id: str) -> Dict[str, Any]:
         """

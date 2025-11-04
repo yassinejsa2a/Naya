@@ -5,6 +5,7 @@ Review Repository for NAYA Travel Journal
 
 from typing import List, Optional
 from app.models.review import Review
+from app.models.place import Place
 from app.repositories.base_repository import SQLAlchemyRepository
 
 class ReviewRepository(SQLAlchemyRepository):
@@ -71,10 +72,17 @@ class ReviewRepository(SQLAlchemyRepository):
         """
         try:
             search_pattern = f"%{search_term}%"
-            query = Review.query.filter(
-                (Review.title.ilike(search_pattern)) |
-                (Review.content.ilike(search_pattern))
-            ).order_by(Review.created_at.desc())
+            query = (
+                Review.query.join(Place, Review.place_id == Place.id, isouter=True)
+                .filter(
+                    (Review.title.ilike(search_pattern)) |
+                    (Review.content.ilike(search_pattern)) |
+                    (Place.name.ilike(search_pattern)) |
+                    (Place.city.ilike(search_pattern)) |
+                    (Place.country.ilike(search_pattern))
+                )
+                .order_by(Review.created_at.desc())
+            )
             
             if limit:
                 query = query.limit(limit)

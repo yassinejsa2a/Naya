@@ -14,12 +14,14 @@ from werkzeug.utils import secure_filename
 
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.services.review_service import ReviewService
 
 class AuthService:
     """Authentication service for user management"""
     
     def __init__(self):
         self.user_repository = UserRepository()
+        self.review_service = ReviewService()
     
     def register_user(self, user_data):
         """
@@ -132,7 +134,11 @@ class AuthService:
         if not user:
             raise ValueError("User not found")
         
-        return user.to_dict()
+        profile = user.to_dict()
+        liked_summary = self.review_service.get_liked_reviews_for_user(user_id, limit=20)
+        profile['liked_reviews'] = liked_summary.get('reviews', [])
+        profile['liked_reviews_count'] = liked_summary.get('total', len(profile['liked_reviews']))
+        return profile
     
     def update_user_profile(self, user_id, update_data):
         """

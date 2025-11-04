@@ -29,6 +29,8 @@ class User(BaseModel):
     # Relationships
     reviews = db.relationship('Review', backref='author', lazy=True, cascade='all, delete-orphan')
     photos = db.relationship('Photo', backref='uploader', lazy=True, cascade='all, delete-orphan')
+    review_likes = db.relationship('ReviewLike', back_populates='user', cascade='all, delete-orphan', lazy='dynamic')
+    review_comments = db.relationship('ReviewComment', back_populates='user', cascade='all, delete-orphan', lazy='dynamic')
     
     def __init__(self, *args, **kwargs):
         password = kwargs.pop('password', None)

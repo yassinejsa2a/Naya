@@ -642,6 +642,92 @@ iframe {
   margin-top: 1rem;
 }
 
+.detail-comments {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+  padding-top: 1.2rem;
+}
+
+.comment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.comment-item {
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.9rem;
+  background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.comment-author {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.comment-meta {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.comment-content {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.comment-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.comment-form textarea {
+  width: 100%;
+  min-height: 96px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-border) 75%, transparent);
+  padding: 0.65rem 0.8rem;
+  font: inherit;
+  resize: vertical;
+  transition: border var(--transition-base), box-shadow var(--transition-base);
+}
+
+.comment-form textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-primary-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-soft) 60%, transparent);
+}
+
+.comment-empty {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.comment-login-hint {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
 .review-edit-form {
   margin-top: 1rem;
   display: grid;
@@ -728,6 +814,24 @@ iframe {
   gap: 1.2rem;
 }
 
+.reviews--compact {
+  gap: 0.9rem;
+}
+
+.reviews--compact .review-card, .review-card--compact {
+  cursor: default;
+}
+
+.reviews--compact .review-card:hover,
+.reviews--compact .review-card:focus-visible,
+.review-card--compact:hover,
+.review-card--compact:focus-visible {
+  transform: none;
+  border-color: var(--color-border);
+  box-shadow: none;
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+}
+
 .review-card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -738,6 +842,55 @@ iframe {
   cursor: pointer;
   transition: border var(--transition-base), transform var(--transition-base),
     box-shadow var(--transition-base), background var(--transition-base);
+}
+
+.review-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.review-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  color: var(--color-muted);
+  padding: 0.35rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border var(--transition-base), background var(--transition-base), color var(--transition-base), transform var(--transition-base);
+}
+
+.review-like-btn:hover,
+.review-like-btn:focus-visible {
+  border-color: var(--color-border-strong);
+  color: var(--color-primary-strong);
+  background: color-mix(in srgb, var(--color-primary-soft) 40%, var(--color-surface));
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.review-like-btn.active {
+  color: var(--color-primary-strong);
+  border-color: var(--color-primary-strong);
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+}
+
+.review-like-count {
+  font-weight: 600;
+  color: var(--color-primary-strong);
+}
+
+.review-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .review-card__header {
@@ -884,6 +1037,33 @@ iframe {
   border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
   display: grid;
   gap: 0.3rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+  color: var(--color-primary-strong);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.liked-card {
+  margin-top: 2rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.liked-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
 
 dt {

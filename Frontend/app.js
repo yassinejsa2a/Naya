@@ -32,6 +32,9 @@ const publicProfilePhotosCount = document.getElementById('public-profile-photos-
 const publicProfileBackBtn = document.getElementById('public-profile-back');
 const publicProfileTitle = document.getElementById('public-profile-title');
 const publicProfileSubtitle = document.getElementById('public-profile-subtitle');
+const likedReviewsList = document.getElementById('liked-reviews-list');
+const likedReviewsCount = document.getElementById('liked-reviews-count');
+const likedReviewsFeedback = document.getElementById('liked-reviews-feedback');
 
 const authFeedback = document.getElementById('auth-feedback');
 const feedFeedback = document.getElementById('feed-feedback');
@@ -281,7 +284,18 @@ const detectDefaultApiBaseUrl = () => {
     hostname === '::1';
 
   if (isLocalHost) {
-    return 'http://127.0.0.1:5000/api/v1';
+    const localTargetHost = '127.0.0.1';
+    const usesDefaultHttpPort = !port || port === '' || port === '80';
+    const preferredPort = usesDefaultHttpPort ? '8000' : '5000';
+    try {
+      return normaliseApiBaseUrl(`${localTargetHost}:${preferredPort}`);
+    } catch (error) {
+      console.warn(
+        "NAYA : tentative de détection de l'API locale échouée, retour à la valeur par défaut.",
+        error
+      );
+      return `http://${localTargetHost}:${preferredPort}/api/v1`;
+    }
   }
 
   if (isHttpProtocol && (!port || port === '' || port === '80' || port === '443' || port === '5000')) {
@@ -300,7 +314,7 @@ const detectDefaultApiBaseUrl = () => {
     }
   }
 
-  return 'http://127.0.0.1:5000/api/v1';
+  return 'http://127.0.0.1:8000/api/v1';
 };
 
 const defaultApiBaseUrl = detectDefaultApiBaseUrl();
@@ -331,6 +345,10 @@ let lastCreatedReviewId = null;
 let activeEditReviewId = null;
 let publicProfileUserId = null;
 let publicProfileReviews = [];
+let likedReviews = [];
+let likedReviewsTotal = 0;
+const likedReviewIds = new Set();
+const reviewCommentsCache = new Map();
 const placeIdCache = new Map();
 
 const formatDate = (iso) => {
@@ -490,6 +508,35 @@ const buildPlaceCacheKey = (name, city, country) =>
   [normaliseFieldValue(name).toLowerCase(), normaliseFieldValue(city).toLowerCase(), normaliseFieldValue(country).toLowerCase()].join(
     '::'
   );
+
+const reviewCollections = () => [lastReviews, mapReviews, publicProfileReviews, likedReviews];
+
+const updateReviewCollections = (reviewId, transformer) => {
+  const id = String(reviewId);
+  const collections = reviewCollections();
+  collections.forEach((collection) => {
+    if (!Array.isArray(collection)) return;
+    const itemIndex = collection.findIndex((entry) => entry && String(entry.id) === id);
+    if (itemIndex !== -1) {
+      const current = collection[itemIndex];
+      const nextValue = transformer({ ...current });
+      collection[itemIndex] = nextValue;
+    }
+  });
+};
+
+const findReviewById = (reviewId) => {
+  const id = String(reviewId);
+  const collections = reviewCollections();
+  for (const collection of collections) {
+    if (!Array.isArray(collection)) continue;
+    const match = collection.find((entry) => entry && String(entry.id) === id);
+    if (match) {
+      return match;
+    }
+  }
+  return null;
+};
 
 const findExistingPlaceId = async (name, city, country) => {
   if (!name && !city && !country) {
@@ -673,6 +720,23 @@ const api = {
         },
         { requiresAuth: true }
       ),
+    like: (id) => fetchJson(`/reviews/${id}/likes`, { method: 'POST' }, { requiresAuth: true }),
+    unlike: (id) => fetchJson(`/reviews/${id}/likes`, { method: 'DELETE' }, { requiresAuth: true }),
+    likes: (id) => fetchJson(`/reviews/${id}/likes`, { method: 'GET' }, { requiresAuth: Boolean(authToken) }),
+    comments: {
+      list: (id, params = {}) => fetchJson(`/reviews/${id}/comments${buildQueryString(params)}`, { method: 'GET' }, { requiresAuth: Boolean(authToken) }),
+      create: (id, payload) =>
+        fetchJson(
+          `/reviews/${id}/comments`,
+          {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          },
+          { requiresAuth: true }
+        ),
+      delete: (reviewId, commentId) =>
+        fetchJson(`/reviews/${reviewId}/comments/${commentId}`, { method: 'DELETE' }, { requiresAuth: true }),
+    },
     delete: (id) => fetchJson(`/reviews/${id}`, { method: 'DELETE' }, { requiresAuth: true }),
   },
   auth: {
@@ -800,6 +864,7 @@ const highlightReviewItems = () => {
 const renderMapFeed = (reviews = []) => {
   if (!mapFeedList) return;
   mapReviews = Array.isArray(reviews) ? [...reviews] : [];
+  reconcileLikedStateAcrossCollections();
   mapFeedList.innerHTML = '';
 
   setMapFeedback('');
@@ -874,7 +939,7 @@ const renderMapFeed = (reviews = []) => {
   highlightReviewItems();
 };
 
-const createReviewCard = (review, { interactive = true } = {}) => {
+const createReviewCard = (review, { interactive = true, compact = false } = {}) => {
   const item = document.createElement('li');
   item.className = 'review-card';
   item.dataset.reviewId = review.id;
@@ -895,6 +960,10 @@ const createReviewCard = (review, { interactive = true } = {}) => {
   } else {
     item.tabIndex = -1;
     item.classList.add('review-card--static');
+  }
+
+  if (compact) {
+    item.classList.add('review-card--compact');
   }
 
   const header = document.createElement('div');
@@ -961,6 +1030,17 @@ const createReviewCard = (review, { interactive = true } = {}) => {
   content.textContent = review.content || 'Aucune description fournie.';
 
   item.append(header, meta, content);
+
+  const footer = document.createElement('div');
+  footer.className = 'review-card__footer';
+  const likeButton = createLikeButton(review, { variant: 'card' });
+  footer.appendChild(likeButton);
+  const commentsCounter = document.createElement('span');
+  commentsCounter.className = 'review-comments-count';
+  commentsCounter.dataset.reviewId = review.id;
+  commentsCounter.textContent = formatCountLabel(review.comments_count ?? 0, 'commentaire');
+  footer.appendChild(commentsCounter);
+  item.appendChild(footer);
 
   if (Array.isArray(review.photos) && review.photos.length) {
     const gallery = document.createElement('div');
@@ -1061,7 +1141,7 @@ const renderPublicProfileReviews = (reviews = []) => {
   setFeedback(publicProfileFeedback, '');
   const fragment = document.createDocumentFragment();
   publicProfileReviews.forEach((review) => {
-    const card = createReviewCard(review, { interactive: false });
+    const card = createReviewCard(review, { interactive: false, compact: true });
     fragment.appendChild(card);
   });
   publicProfileReviewsList.appendChild(fragment);
@@ -1118,6 +1198,374 @@ const buildRatingLabel = (rating) => {
   if (typeof rating !== 'number' || Number.isNaN(rating)) return 'Note indisponible';
   const stars = '★'.repeat(Math.round(rating));
   return `${stars} (${rating}/5)`;
+};
+
+const formatCountLabel = (value, singular, plural) => {
+  const safeCount = typeof value === 'number' && !Number.isNaN(value) ? value : 0;
+  const word = safeCount > 1 ? plural || `${singular}s` : singular;
+  return `${safeCount.toLocaleString('fr-FR')} ${word}`;
+};
+
+const updateLikeButtonState = (button, likesCount, liked) => {
+  if (!button) return;
+  const safeCount = typeof likesCount === 'number' && !Number.isNaN(likesCount) ? likesCount : 0;
+  button.dataset.likesCount = String(safeCount);
+  button.setAttribute('aria-pressed', liked ? 'true' : 'false');
+  button.classList.toggle('active', Boolean(liked));
+  const icon = liked ? '❤' : '♡';
+  button.textContent = `${icon} ${safeCount.toLocaleString('fr-FR')}`;
+};
+
+const updateLikeButtonsInDOM = (reviewId, likesCount, liked) => {
+  const buttons = document.querySelectorAll(`.review-like-btn[data-review-id="${reviewId}"]`);
+  buttons.forEach((button) => updateLikeButtonState(button, likesCount, liked));
+};
+
+const refreshLikedReviewsUI = () => {
+  if (!likedReviewsList || !likedReviewsCount) return;
+  likedReviewsCount.textContent = likedReviewsTotal.toLocaleString('fr-FR');
+  likedReviewsList.innerHTML = '';
+
+  if (!likedReviewsTotal) {
+    if (likedReviewsFeedback) {
+      likedReviewsFeedback.textContent = "Vous n'avez pas encore aimé d'avis.";
+    }
+    return;
+  }
+
+  if (likedReviewsFeedback) {
+    if (likedReviewsTotal > likedReviews.length) {
+      likedReviewsFeedback.textContent = `Affichage des ${likedReviews.length.toLocaleString('fr-FR')} plus récents sur ${likedReviewsTotal.toLocaleString('fr-FR')} likes.`;
+    } else {
+      likedReviewsFeedback.textContent = '';
+    }
+  }
+
+  const fragment = document.createDocumentFragment();
+  likedReviews.slice(0, 20).forEach((review) => {
+    const card = createReviewCard(review, { interactive: false, compact: true });
+    fragment.appendChild(card);
+  });
+  likedReviewsList.appendChild(fragment);
+};
+
+const reconcileLikedStateAcrossCollections = () => {
+  const ids = new Set(Array.from(likedReviewIds, (value) => String(value)));
+  reviewCollections().forEach((collection) => {
+    if (!Array.isArray(collection)) return;
+    collection.forEach((review, index) => {
+      if (!review) return;
+      collection[index] = { ...review, liked_by_user: ids.has(String(review.id)) };
+    });
+  });
+};
+
+const applyLikeSummary = (reviewId, likesCount, likedByUser) => {
+  const id = String(reviewId);
+  const wasLiked = likedReviewIds.has(id);
+  if (likedByUser) {
+    likedReviewIds.add(id);
+    if (!wasLiked) {
+      likedReviewsTotal += 1;
+    }
+  } else {
+    likedReviewIds.delete(id);
+    if (wasLiked) {
+      likedReviewsTotal = Math.max(0, likedReviewsTotal - 1);
+    }
+  }
+
+  updateReviewCollections(reviewId, (review) => ({
+    ...review,
+    likes_count: likesCount,
+    liked_by_user: likedByUser,
+  }));
+
+  const existingIndex = likedReviews.findIndex((item) => item && String(item.id) === id);
+  if (likedByUser) {
+    const source = findReviewById(reviewId);
+    const enriched = source ? { ...source, likes_count: likesCount, liked_by_user: true } : null;
+    if (existingIndex === -1 && enriched) {
+      likedReviews = [enriched, ...likedReviews];
+    } else if (existingIndex !== -1) {
+      likedReviews[existingIndex] = { ...likedReviews[existingIndex], likes_count: likesCount, liked_by_user: true };
+    }
+  } else if (existingIndex !== -1) {
+    likedReviews.splice(existingIndex, 1);
+  }
+
+  if (likedReviews.length > 20) {
+    likedReviews = likedReviews.slice(0, 20);
+  }
+
+  refreshLikedReviewsUI();
+  updateLikeButtonsInDOM(reviewId, likesCount, likedByUser);
+};
+
+const handleLikeToggle = async (reviewId, button) => {
+  if (!authToken) {
+    showGlobalMessage('Connectez-vous pour aimer une publication.', true);
+    showView('auth-view');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+  }
+
+  try {
+    const isActive = button?.classList.contains('active');
+    const response = isActive ? await api.reviews.unlike(reviewId) : await api.reviews.like(reviewId);
+    const summary = response?.data || response;
+    const likesCount = summary?.likes_count ?? 0;
+    const likedByUser = summary?.liked_by_user ?? false;
+    applyLikeSummary(reviewId, likesCount, likedByUser);
+  } catch (error) {
+    console.error(error);
+    showGlobalMessage(error.message || "Impossible de mettre à jour votre like.", true);
+  } finally {
+    if (button) {
+      button.disabled = false;
+    }
+  }
+};
+
+const createLikeButton = (review, { variant = 'card' } = {}) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'review-like-btn';
+  if (variant === 'detail') {
+    button.classList.add('review-like-btn--detail');
+  }
+  button.dataset.reviewId = review.id;
+  updateLikeButtonState(button, review.likes_count ?? 0, Boolean(review.liked_by_user));
+  button.addEventListener('click', () => handleLikeToggle(review.id, button));
+  return button;
+};
+
+const ensureLikedReviewsFromProfile = (likedPayload = [], total = null) => {
+  likedReviews = Array.isArray(likedPayload) ? likedPayload.map((item) => ({ ...item, liked_by_user: true })) : [];
+  likedReviewsTotal = typeof total === 'number' && !Number.isNaN(total) ? total : likedReviews.length;
+  likedReviewIds.clear();
+  likedReviews.forEach((review) => {
+    if (review?.id) {
+      likedReviewIds.add(String(review.id));
+    }
+  });
+  reconcileLikedStateAcrossCollections();
+  refreshLikedReviewsUI();
+};
+
+const updateCommentCountDisplays = (reviewId, count) => {
+  const safeCount = typeof count === 'number' && !Number.isNaN(count) ? count : 0;
+  const elements = document.querySelectorAll(`.review-comments-count[data-review-id="${reviewId}"]`);
+  elements.forEach((element) => {
+    element.textContent = formatCountLabel(safeCount, 'commentaire');
+  });
+};
+
+const commentSections = new Map();
+
+const renderCommentItem = (comment, reviewId) => {
+  const item = document.createElement('li');
+  item.className = 'comment-item';
+  item.dataset.commentId = comment.id;
+  item.dataset.reviewId = reviewId;
+
+  const header = document.createElement('div');
+  header.className = 'comment-header';
+
+  const author = document.createElement('span');
+  author.className = 'comment-author';
+  author.textContent = comment.user?.username || 'Voyageur';
+
+  const meta = document.createElement('span');
+  meta.className = 'comment-meta';
+  if (comment.created_at) {
+    const createdAt = new Date(comment.created_at);
+    meta.textContent = createdAt.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+  } else {
+    meta.textContent = '—';
+  }
+
+  header.append(author, meta);
+  item.appendChild(header);
+
+  const content = document.createElement('p');
+  content.className = 'comment-content';
+  content.textContent = comment.content || '';
+  item.appendChild(content);
+
+  if (currentUser && (currentUser.id === comment.user?.id || currentUser.is_admin)) {
+    const actions = document.createElement('div');
+    actions.className = 'comment-actions';
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'danger-btn';
+    deleteBtn.textContent = 'Supprimer';
+    deleteBtn.addEventListener('click', () => handleCommentDelete(reviewId, comment.id));
+    actions.appendChild(deleteBtn);
+    item.appendChild(actions);
+  }
+
+  return item;
+};
+
+const renderCommentsList = (listElement, comments, reviewId) => {
+  if (!listElement) return;
+  const placeholder = listElement.parentElement?.querySelector('.comment-empty');
+  if (placeholder) {
+    placeholder.remove();
+  }
+
+  listElement.innerHTML = '';
+  if (!comments.length) {
+    const empty = document.createElement('p');
+    empty.className = 'comment-empty';
+    empty.textContent = 'Aucun commentaire pour le moment.';
+    listElement.parentElement?.insertBefore(empty, listElement);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  comments.forEach((comment) => fragment.appendChild(renderCommentItem(comment, reviewId)));
+  listElement.appendChild(fragment);
+};
+
+const loadCommentsForReview = async (reviewId, elements) => {
+  if (!elements) return;
+  const { list, title } = elements;
+
+  const cached = reviewCommentsCache.get(reviewId);
+  if (cached) {
+    renderCommentsList(list, cached.comments, reviewId);
+    if (title) {
+      title.textContent = `Commentaires (${cached.count})`;
+    }
+    updateCommentCountDisplays(reviewId, cached.count);
+    return;
+  }
+
+  try {
+    const response = await api.reviews.comments.list(reviewId);
+    const comments = response?.comments || response?.data?.comments || [];
+    const count = response?.count ?? response?.data?.count ?? comments.length;
+    reviewCommentsCache.set(reviewId, { comments, count });
+    renderCommentsList(list, comments, reviewId);
+    if (title) {
+      title.textContent = `Commentaires (${count})`;
+    }
+    updateCommentCountDisplays(reviewId, count);
+  } catch (error) {
+    console.error(error);
+    const errorMessage = document.createElement('p');
+    errorMessage.className = 'comment-empty';
+    errorMessage.textContent = 'Impossible de charger les commentaires.';
+    const existing = list.parentElement?.querySelector('.comment-empty');
+    if (existing) {
+      existing.remove();
+    }
+    list.innerHTML = '';
+    list.parentElement?.insertBefore(errorMessage, list);
+  }
+};
+
+const handleCommentSubmit = async (event) => {
+  event.preventDefault();
+  if (!authToken) {
+    showGlobalMessage('Connectez-vous pour commenter.', true);
+    showView('auth-view');
+    return;
+  }
+
+  const form = event.currentTarget;
+  const reviewId = form.dataset.reviewId;
+  const textarea = form.querySelector('textarea[name="comment"]');
+  if (!reviewId || !textarea) return;
+
+  const rawContent = textarea.value.trim();
+  if (rawContent.length < 2) {
+    showGlobalMessage('Le commentaire doit contenir au moins 2 caractères.', true);
+    return;
+  }
+
+  const submitBtn = form.querySelector('button[type="submit"]');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+  }
+
+  try {
+    const response = await api.reviews.comments.create(reviewId, { content: rawContent });
+    const payload = response?.data || response;
+    const comment = payload?.comment;
+    const count = payload?.comments_count ?? 0;
+
+    if (comment) {
+      const cache = reviewCommentsCache.get(reviewId) || { comments: [], count: 0 };
+      cache.comments = [...cache.comments, comment];
+      cache.count = count;
+      reviewCommentsCache.set(reviewId, cache);
+
+      const section = commentSections.get(reviewId);
+      if (section?.list) {
+        renderCommentsList(section.list, cache.comments, reviewId);
+      }
+      if (section?.title) {
+        section.title.textContent = `Commentaires (${count})`;
+      }
+
+      updateCommentCountDisplays(reviewId, count);
+      updateReviewCollections(reviewId, (review) => ({ ...review, comments_count: count }));
+      textarea.value = '';
+      showGlobalMessage('Commentaire ajouté.', false);
+    }
+  } catch (error) {
+    console.error(error);
+    showGlobalMessage(error.message || "Impossible d'ajouter le commentaire.", true);
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+    }
+  }
+};
+
+const handleCommentDelete = async (reviewId, commentId) => {
+  if (!authToken) {
+    showGlobalMessage('Connectez-vous pour gérer vos commentaires.', true);
+    showView('auth-view');
+    return;
+  }
+
+  if (!window.confirm('Supprimer ce commentaire ?')) {
+    return;
+  }
+
+  try {
+    const response = await api.reviews.comments.delete(reviewId, commentId);
+    const payload = response?.data || response;
+    const count = payload?.comments_count ?? 0;
+
+    const cache = reviewCommentsCache.get(reviewId);
+    if (cache) {
+      cache.comments = cache.comments.filter((comment) => String(comment.id) !== String(commentId));
+      cache.count = count;
+      reviewCommentsCache.set(reviewId, cache);
+      const section = commentSections.get(reviewId);
+      if (section?.list) {
+        renderCommentsList(section.list, cache.comments, reviewId);
+      }
+      if (section?.title) {
+        section.title.textContent = `Commentaires (${count})`;
+      }
+    }
+
+    updateCommentCountDisplays(reviewId, count);
+    updateReviewCollections(reviewId, (review) => ({ ...review, comments_count: count }));
+    showGlobalMessage('Commentaire supprimé.', false);
+  } catch (error) {
+    console.error(error);
+    showGlobalMessage(error.message || 'Impossible de supprimer le commentaire.', true);
+  }
 };
 
 const userOwnsResource = (resourceUserId) => {
@@ -1333,6 +1781,7 @@ const renderReviewDetailContent = (review) => {
   reviewDetailPanel.classList.remove('hidden');
   clearDetailPanel();
   removeReviewEditForm();
+  commentSections.clear();
 
   const place = review.place || {};
   const visitDate = review.visit_date ? formatDate(review.visit_date) : null;
@@ -1424,7 +1873,17 @@ const renderReviewDetailContent = (review) => {
     placeBlock.appendChild(placeDescription);
   }
 
-  reviewDetailBody.append(authorBlock, hero, contentBlock, placeBlock);
+  const detailFooter = document.createElement('div');
+  detailFooter.className = 'review-card__footer';
+  const detailLikeButton = createLikeButton(review, { variant: 'detail' });
+  detailFooter.appendChild(detailLikeButton);
+  const detailCommentsCounter = document.createElement('span');
+  detailCommentsCounter.className = 'review-comments-count';
+  detailCommentsCounter.dataset.reviewId = review.id;
+  detailCommentsCounter.textContent = formatCountLabel(review.comments_count ?? 0, 'commentaire');
+  detailFooter.appendChild(detailCommentsCounter);
+
+  reviewDetailBody.append(authorBlock, hero, contentBlock, placeBlock, detailFooter);
 
 
   if (canManageReview(review)) {
@@ -1493,6 +1952,48 @@ const renderReviewDetailContent = (review) => {
     noPhotos.textContent = 'Aucune photo pour le moment. Ajoutez-en une via le formulaire ci-dessous.';
     reviewDetailBody.appendChild(noPhotos);
   }
+
+  const commentsSection = document.createElement('section');
+  commentsSection.className = 'detail-comments';
+
+  const commentsTitle = document.createElement('h4');
+  commentsTitle.textContent = `Commentaires (${review.comments_count ?? 0})`;
+  commentsSection.appendChild(commentsTitle);
+
+  const commentsList = document.createElement('ul');
+  commentsList.className = 'comment-list';
+  commentsSection.appendChild(commentsList);
+
+  const sectionEntry = { list: commentsList, title: commentsTitle };
+
+  if (authToken) {
+    const form = document.createElement('form');
+    form.className = 'comment-form';
+    form.dataset.reviewId = review.id;
+    const textarea = document.createElement('textarea');
+    textarea.name = 'comment';
+    textarea.placeholder = 'Partagez votre ressenti…';
+    textarea.required = true;
+    form.appendChild(textarea);
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'submit';
+    submitBtn.className = 'secondary-btn';
+    submitBtn.textContent = 'Publier';
+    form.appendChild(submitBtn);
+    form.addEventListener('submit', handleCommentSubmit);
+    commentsSection.appendChild(form);
+    sectionEntry.form = form;
+  } else {
+    const loginHint = document.createElement('p');
+    loginHint.className = 'comment-login-hint';
+    loginHint.textContent = 'Connectez-vous pour écrire un commentaire.';
+    commentsSection.appendChild(loginHint);
+  }
+
+  commentSections.set(review.id, sectionEntry);
+  reviewDetailBody.appendChild(commentsSection);
+  updateCommentCountDisplays(review.id, review.comments_count ?? 0);
+  loadCommentsForReview(review.id, sectionEntry);
 };
 
 const showReviewDetail = async (reviewId) => {
@@ -1534,6 +2035,7 @@ const loadFeed = async (query = {}) => {
     setFeedback(feedFeedback, 'Chargement des aventures…');
     const data = await api.reviews.list(query);
     lastReviews = data.reviews || [];
+    reconcileLikedStateAcrossCollections();
     renderReviews(lastReviews);
     setFeedback(feedFeedback, lastReviews.length ? '' : '');
   } catch (error) {
@@ -1556,6 +2058,13 @@ const loadProfile = async () => {
     profileCreated.textContent = formatDate(profile.created_at);
     profileReviewCount.textContent = stats.reviews_count ?? '0';
     setProfileAvatar(profile.profile_photo_url, profile.username || '');
+
+    ensureLikedReviewsFromProfile(profile.liked_reviews || [], profile.liked_reviews_count ?? null);
+    lastReviews.forEach((review) => {
+      if (!review?.id) return;
+      const liked = likedReviewIds.has(String(review.id));
+      updateLikeButtonsInDOM(review.id, review.likes_count ?? 0, liked);
+    });
 
     profileForm.username.value = profile.username || '';
     profileForm.bio.value = profile.bio || '';
@@ -1668,6 +2177,12 @@ const saveAuthState = (token, user, refresh, { silent = false } = {}) => {
 
 const clearAuthState = () => {
   saveAuthState(null, null, null);
+  likedReviews = [];
+  likedReviewsTotal = 0;
+  likedReviewIds.clear();
+  refreshLikedReviewsUI();
+  reviewCommentsCache.clear();
+  commentSections.clear();
 };
 
 const updateLayoutForAuth = () => {

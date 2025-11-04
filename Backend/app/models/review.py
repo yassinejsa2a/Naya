@@ -18,6 +18,9 @@ class Review(BaseModel):
     # Foreign keys
     user_id = db.Column(db.String(60), db.ForeignKey('users.id'), nullable=False)
     place_id = db.Column(db.String(60), db.ForeignKey('places.id'), nullable=False)
+
+    likes = db.relationship('ReviewLike', back_populates='review', cascade='all, delete-orphan', lazy='dynamic')
+    comments = db.relationship('ReviewComment', back_populates='review', cascade='all, delete-orphan', lazy=True)
     
     def __repr__(self):
         return f'<Review {self.title}>'
