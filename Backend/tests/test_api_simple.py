@@ -1,43 +1,42 @@
 #!/usr/bin/env python3
 """
-Simple API Structure Test for NAYA Travel Journal
+Basic smoke tests for the NAYA API to ensure public routes stay reachable.
 """
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import pytest
 
 from app import create_app
 
-def main():
-    """Test API structure"""
-    print("🧪 Testing NAYA API Structure...")
-    
-    try:
-        app = create_app()
-        print("✅ Flask app created successfully")
-        
-        with app.test_client() as client:
-            # Test home endpoint
-            response = client.get('/')
-            print(f"✅ Home endpoint: {response.status_code}")
-            
-            # Test API endpoints
-            endpoints = ['/api/v1/places', '/api/v1/reviews', '/api/v1/photos']
-            
-            for endpoint in endpoints:
-                try:
-                    response = client.get(endpoint)
-                    print(f"✅ {endpoint}: {response.status_code}")
-                except Exception as e:
-                    print(f"❌ {endpoint}: ERROR - {e}")
-        
-        print("\n✨ API structure test completed successfully!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Test failed: {e}")
-        return False
 
-if __name__ == "__main__":
-    main()
+@pytest.fixture(scope="module")
+def client():
+    """Provide a Flask test client with the default configuration."""
+    app = create_app()
+    app.config.update(TESTING=True)
+    with app.test_client() as test_client:
+        yield test_client
+
+
+def test_home_endpoint(client):
+    """Home route returns a JSON payload describing the API state."""
+    response = client.get('/')
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["message"] == "NAYA Travel Journal API"
+    assert data["status"] == "running"
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "/api/v1/places",
+        "/api/v1/reviews",
+        "/api/v1/photos",
+    ],
+)
+def test_public_collections_are_accessible(client, endpoint):
+    """Ensure read-only collection endpoints respond with HTTP 200."""
+    response = client.get(endpoint)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data.get("success") is True
