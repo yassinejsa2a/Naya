@@ -6,7 +6,7 @@ Review Service for NAYA Travel Journal
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 
-from Backend.app.models.user import User
+from app.models.user import User
 from app.models.place import Place
 from app.models.review import Review
 from app.models.review_like import ReviewLike
