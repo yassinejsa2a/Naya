@@ -3,6 +3,8 @@
 Photo Model for NAYA Travel Journal
 """
 
+# Stocke les métadonnées et liens des photos uploadées.
+
 from app import db
 from app.models.base_model import BaseModel
 

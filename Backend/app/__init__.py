@@ -3,6 +3,8 @@
 NAYA Travel Journal - Flask Application
 """
 
+# Fabrique Flask qui branche config, extensions et base.
+
 import logging
 import os
 

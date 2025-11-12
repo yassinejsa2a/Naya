@@ -3,6 +3,8 @@
 ReviewLike Model for NAYA Travel Journal
 """
 
+# Lie un utilisateur à un avis liké (paire unique).
+
 from app import db
 from app.models.base_model import BaseModel
 

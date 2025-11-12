@@ -32,6 +32,7 @@ class User(BaseModel):
     review_likes = db.relationship('ReviewLike', back_populates='user', cascade='all, delete-orphan', lazy='dynamic')
     review_comments = db.relationship('ReviewComment', back_populates='user', cascade='all, delete-orphan', lazy='dynamic')
     
+    # Garantit le passage par set_password.
     def __init__(self, *args, **kwargs):
         password = kwargs.pop('password', None)
         super().__init__(*args, **kwargs)
@@ -39,18 +40,21 @@ class User(BaseModel):
         if password:
             self.set_password(password)
     
+    # Hache les mots de passe.
     def set_password(self, password):
         """Hash password"""
         if not password or len(password) < 6:
             raise ValueError("Password must be at least 6 characters long")
         self.password_hash = generate_password_hash(password)
     
+    # Vérifie le mot de passe.
     def check_password(self, password):
         """Check if provided password matches hash"""
         if not password or not self.password_hash:
             return False
         return check_password_hash(self.password_hash, password)
     
+    # Sérialise les champs sûrs.
     def to_dict(self):
         """Convert user to dictionary (exclude sensitive data)"""
         user_dict = super().to_dict()
@@ -62,6 +66,7 @@ class User(BaseModel):
         user_dict['profile_photo_url'] = self.profile_photo_url
         return user_dict
     
+    # Construit le profil public.
     def to_public_dict(self):
         """Public user information for display"""
         return {
@@ -76,6 +81,7 @@ class User(BaseModel):
         }
     
     @property
+    # Nom d'affichage.
     def full_name(self):
         """Get user's full name"""
         if self.first_name and self.last_name:
@@ -83,16 +89,19 @@ class User(BaseModel):
         return self.username
     
     @property
+    # Nombre d'avis.
     def reviews_count(self):
         """Get number of reviews by user"""
         return len(self.reviews)
     
     @property
+    # Nombre de photos.
     def photos_count(self):
         """Get number of photos by user"""
         return len(self.photos)
 
     @property
+    # URL absolue de l'avatar.
     def profile_photo_url(self):
         """Return an absolute URL to the user's profile photo if available."""
         if not self.profile_photo:
@@ -105,12 +114,14 @@ class User(BaseModel):
         except Exception:
             return None
     
+    # Vérifie le format email.
     def validate_email(self):
         """Validate email format"""
         import re
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return re.match(pattern, self.email) is not None
     
+    # Vérifie le format du pseudo.
     def validate_username(self):
         """Validate username format"""
         if not self.username or len(self.username) < 3:
@@ -119,5 +130,6 @@ class User(BaseModel):
         import re
         return re.match(r'^[a-zA-Z0-9_]+$', self.username) is not None
     
+    # Représentation texte.
     def __repr__(self):
         return f'<User {self.username}>'

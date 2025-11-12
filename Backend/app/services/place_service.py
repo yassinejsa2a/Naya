@@ -3,6 +3,8 @@
 Place Service for NAYA Travel Journal - Version simplifiée
 """
 
+# Gère validation, recherche et stats des lieux.
+
 from typing import List, Optional, Dict, Any
 from app.models.place import Place
 from app.repositories.place_repository import PlaceRepository
@@ -11,10 +13,12 @@ from app.repositories.review_repository import ReviewRepository
 class PlaceService:
     """Service for place business logic"""
     
+    # Initialise les dépôts.
     def __init__(self):
         self.place_repository = PlaceRepository()
         self.review_repository = ReviewRepository()
     
+    # Crée un lieu.
     def create_place(self, place_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new place
@@ -59,6 +63,7 @@ class PlaceService:
         created_place = self.place_repository.create(place)
         return created_place.to_dict()
     
+    # Récupère un lieu avec stats.
     def get_place_by_id(self, place_id: str) -> Optional[Dict[str, Any]]:
         """
         Get place by ID with statistics
@@ -78,6 +83,7 @@ class PlaceService:
         
         return place_data
     
+    # Met à jour un lieu.
     def update_place(self, place_id: str, place_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Update place
@@ -112,6 +118,7 @@ class PlaceService:
             
         return updated_place.to_dict()
     
+    # Supprime un lieu.
     def delete_place(self, place_id: str) -> bool:
         """
         Delete place
@@ -126,6 +133,7 @@ class PlaceService:
         
         return self.place_repository.delete(place_id)
     
+    # Recherche des lieux.
     def search_places(self, search_term: str = '', city: str = '', country: str = '', limit: int = 20) -> List[Dict[str, Any]]:
         """
         Search places with filters
@@ -159,6 +167,7 @@ class PlaceService:
         
         return result
     
+    # Trouve les lieux proches.
     def get_nearby_places(self, latitude: float, longitude: float, radius: float = 10.0, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Get places near coordinates
@@ -192,6 +201,7 @@ class PlaceService:
         
         return result
     
+    # Calcule les stats du lieu.
     def get_place_statistics(self, place_id: str) -> Dict[str, Any]:
         """
         Get detailed statistics for a place
@@ -214,6 +224,7 @@ class PlaceService:
         
         return stats
     
+    # Valide les coordonnées.
     def _validate_coordinates(self, latitude: float, longitude: float) -> bool:
         """
         Validate geographic coordinates
@@ -230,6 +241,7 @@ class PlaceService:
         except (ValueError, TypeError):
             return False
     
+    # Calcule la distance haversine.
     def _calculate_distance(self, lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """
         Calculate distance between two points using Haversine formula

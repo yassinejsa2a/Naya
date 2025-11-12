@@ -3,6 +3,8 @@
 Review Model for NAYA Travel Journal
 """
 
+# Stocke les avis liés aux lieux, likes et commentaires.
+
 from app import db
 from app.models.base_model import BaseModel
 

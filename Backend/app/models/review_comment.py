@@ -3,6 +3,8 @@
 ReviewComment Model for NAYA Travel Journal
 """
 
+# Contient les commentaires utilisateurs reliés aux avis.
+
 from app import db
 from app.models.base_model import BaseModel
 

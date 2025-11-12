@@ -13,15 +13,18 @@ from app.repositories.base_repository import SQLAlchemyRepository
 class ReviewCommentRepository(SQLAlchemyRepository):
     """Repository helper for ReviewComment operations."""
 
+    # Cible le modèle ReviewComment.
     def __init__(self):
         super().__init__(ReviewComment)
 
+    # Récupère un commentaire pour un avis.
     def get_by_id_for_review(self, comment_id: str, review_id: str) -> Optional[ReviewComment]:
         try:
             return ReviewComment.query.filter_by(id=comment_id, review_id=review_id).first()
         except Exception:
             return None
 
+    # Liste les commentaires d'un avis.
     def list_for_review(self, review_id: str, limit: Optional[int] = None) -> List[ReviewComment]:
         try:
             query = ReviewComment.query.filter_by(review_id=review_id).order_by(ReviewComment.created_at.asc())
@@ -31,12 +34,14 @@ class ReviewCommentRepository(SQLAlchemyRepository):
         except Exception:
             return []
 
+    # Compte les commentaires d'un avis.
     def count_for_review(self, review_id: str) -> int:
         try:
             return ReviewComment.query.filter_by(review_id=review_id).count()
         except Exception:
             return 0
 
+    # Supprime un commentaire d'un avis.
     def delete_for_review(self, comment_id: str, review_id: str) -> bool:
         try:
             comment = self.get_by_id_for_review(comment_id, review_id)

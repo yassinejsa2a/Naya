@@ -10,9 +10,11 @@ from app.repositories.base_repository import SQLAlchemyRepository
 class PhotoRepository(SQLAlchemyRepository):
     """Repository for Photo model operations"""
     
+    # Cible le modèle Photo.
     def __init__(self):
         super().__init__(Photo)
     
+    # Liste les photos d'un utilisateur.
     def get_by_user(self, user_id: str, limit: Optional[int] = None) -> List[Photo]:
         """
         Get photos by user
@@ -30,6 +32,7 @@ class PhotoRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Liste les photos d'un avis.
     def get_by_review(self, review_id: str, limit: Optional[int] = None) -> List[Photo]:
         """
         Get photos for a review
@@ -47,6 +50,7 @@ class PhotoRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Liste les dernières photos.
     def get_recent_photos(self, limit: int = 20) -> List[Photo]:
         """
         Get most recent photos
@@ -60,6 +64,7 @@ class PhotoRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Liste les photos orphelines.
     def get_orphaned_photos(self, limit: Optional[int] = None) -> List[Photo]:
         """
         Get photos not associated with any review

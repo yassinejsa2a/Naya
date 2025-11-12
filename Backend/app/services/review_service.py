@@ -3,6 +3,8 @@
 Review Service for NAYA Travel Journal
 """
 
+# Gère les avis, likes, commentaires et données associées.
+
 from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 
@@ -21,6 +23,7 @@ from app.services.photo_service import PhotoService
 class ReviewService:
     """Service for review business logic"""
     
+    # Initialise les dépôts.
     def __init__(self):
         self.review_repository = ReviewRepository()
         self.place_repository = PlaceRepository()
@@ -29,6 +32,7 @@ class ReviewService:
         self.like_repository = ReviewLikeRepository()
         self.comment_repository = ReviewCommentRepository()
 
+    # Sérialise un commentaire.
     def _serialize_comment(self, comment: ReviewComment) -> Dict[str, Any]:
         """Serialize a review comment with author metadata."""
         user = comment.user or self.user_repository.get(comment.user_id)
@@ -40,6 +44,7 @@ class ReviewService:
             'user': user.to_public_dict() if user else None,
         }
 
+    # Construit le résumé des likes.
     def _build_like_summary(self, review_id: str, current_user_id: Optional[str] = None) -> Dict[str, Any]:
         """Return like summary payload for a review."""
         likes_count = self.like_repository.count_for_review(review_id)
@@ -52,6 +57,7 @@ class ReviewService:
             'liked_by_user': liked_by_user,
         }
 
+    # Sérialise un avis.
     def _serialize_review(
         self,
         review: Review,
@@ -80,6 +86,7 @@ class ReviewService:
 
         return review_data
     
+    # Crée un avis.
     def create_review(self, review_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Create a new review
@@ -187,6 +194,7 @@ class ReviewService:
             'review': self._serialize_review(created_review, current_user_id=review_payload['user_id'], include_comments=True)
         }
     
+    # Récupère un avis.
     def get_review(self, review_id: str) -> Dict[str, Any]:
         """
         Get review by ID
@@ -212,6 +220,7 @@ class ReviewService:
         
         return review_data
     
+    # Met à jour un avis.
     def update_review(self, review_id: str, update_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """
         Update review (only by author)
@@ -284,6 +293,7 @@ class ReviewService:
             'review': self._serialize_review(updated_review, current_user_id=user_id, include_comments=True)
         }
     
+    # Supprime un avis.
     def delete_review(self, review_id: str, user_id: str) -> Dict[str, Any]:
         """
         Delete a review (only by author)
@@ -317,6 +327,7 @@ class ReviewService:
         
         return {'message': 'Review deleted successfully'}
 
+    # Ajoute un like.
     def like_review(self, review_id: str, user_id: str) -> Dict[str, Any]:
         """Register a like from a user on a review."""
         review = self.review_repository.get(review_id)
@@ -340,6 +351,7 @@ class ReviewService:
         summary['message'] = 'Review liked successfully'
         return summary
 
+    # Retire un like.
     def unlike_review(self, review_id: str, user_id: str) -> Dict[str, Any]:
         """Remove a like for a review by the given user."""
         review = self.review_repository.get(review_id)
@@ -358,6 +370,7 @@ class ReviewService:
         summary['message'] = 'Review unliked successfully' if existing else 'Review was not liked'
         return summary
 
+    # Renvoie les données de likes.
     def get_review_likes(self, review_id: str, current_user_id: Optional[str] = None) -> Dict[str, Any]:
         """Return like summary plus a short list of recent likers."""
         review = self.review_repository.get(review_id)
@@ -379,6 +392,7 @@ class ReviewService:
         summary['users'] = users_preview
         return summary
 
+    # Ajoute un commentaire.
     def add_comment(self, review_id: str, user_id: str, content: str) -> Dict[str, Any]:
         """Add a comment to a review."""
         if not content or not content.strip():
@@ -405,6 +419,7 @@ class ReviewService:
             'comments_count': self.comment_repository.count_for_review(review_id),
         }
 
+    # Supprime un commentaire.
     def delete_comment(self, review_id: str, comment_id: str, user_id: str) -> Dict[str, Any]:
         """Delete a comment if the requester is owner or admin."""
         review = self.review_repository.get(review_id)
@@ -431,6 +446,7 @@ class ReviewService:
             'comments_count': self.comment_repository.count_for_review(review_id),
         }
 
+    # Liste les commentaires.
     def list_comments(self, review_id: str, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Return comments for a given review."""
         review = self.review_repository.get(review_id)
@@ -440,6 +456,7 @@ class ReviewService:
         comments = self.comment_repository.list_for_review(review_id, limit)
         return [self._serialize_comment(comment) for comment in comments]
 
+    # Liste les avis likés.
     def get_liked_reviews_for_user(self, user_id: str, limit: Optional[int] = None) -> Dict[str, Any]:
         """Return reviews liked by the specified user."""
         user = self.user_repository.get(user_id)
@@ -462,6 +479,7 @@ class ReviewService:
             'total': total,
         }
     
+    # Liste les avis d'un lieu.
     def get_reviews_by_place(
         self,
         place_id: str,
@@ -487,6 +505,7 @@ class ReviewService:
             for review in reviews
         ]
     
+    # Liste les avis d'un utilisateur.
     def get_reviews_by_user(
         self,
         user_id: str,
@@ -512,6 +531,7 @@ class ReviewService:
             for review in reviews
         ]
     
+    # Liste les avis récents.
     def get_recent_reviews(
         self,
         limit: int = 10,
@@ -531,6 +551,7 @@ class ReviewService:
             for review in reviews
         ]
     
+    # Cherche des avis.
     def search_reviews(
         self,
         search_term: str,
@@ -555,6 +576,7 @@ class ReviewService:
             for review in reviews
         ]
     
+    # Produit les stats de notes.
     def get_review_statistics(self, place_id: str) -> Dict[str, Any]:
         """
         Get review statistics for a place
@@ -578,6 +600,7 @@ class ReviewService:
         
         return stats
     
+    # Récupère un avis par id.
     def get_review_by_id(
         self,
         review_id: str,
@@ -606,6 +629,7 @@ class ReviewService:
             comments_limit=comments_limit,
         )
     
+    # Renvoie les stats d'un lieu.
     def get_place_statistics(self, place_id: str) -> Dict[str, Any]:
         """
         Get place statistics (same as get_review_statistics for compatibility)
@@ -616,6 +640,7 @@ class ReviewService:
         """
         return self.get_review_statistics(place_id)
 
+    # Récupère les photos d'un avis.
     def _get_photos_for_review(self, review_id: str) -> List[Dict[str, Any]]:
         """Return photos associated with a review without redundant review payload."""
         photos = self.photo_service.get_photos_by_review(review_id)
@@ -628,6 +653,7 @@ class ReviewService:
             sanitized.append(photo_copy)
         return sanitized
 
+    # Trouve ou crée un lieu.
     def _get_or_create_place(
         self,
         name: str,
@@ -663,6 +689,7 @@ class ReviewService:
         place = Place(**place_kwargs)
         return self.place_repository.create(place)
 
+    # Analyse la date de visite.
     def _parse_visit_date(self, value: Any) -> date:
         """Parse visit date from various input formats."""
         if isinstance(value, date):

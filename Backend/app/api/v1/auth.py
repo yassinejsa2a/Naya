@@ -3,6 +3,8 @@
 Authentication API endpoints
 """
 
+# Routes auth pour inscription/connexion/profils.
+
 import os
 
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
@@ -13,6 +15,7 @@ auth_bp = Blueprint('auth', __name__)
 auth_service = AuthService()
 
 @auth_bp.route('/register', methods=['POST'])
+# Inscrit un nouvel utilisateur.
 def register():
     """Register new user"""
     try:
@@ -30,6 +33,7 @@ def register():
         return jsonify({"error": "Registration failed"}), 500
 
 @auth_bp.route('/login', methods=['POST'])
+# Authentifie via email/pseudo + mot de passe.
 def login():
     """User login"""
     try:
@@ -54,6 +58,7 @@ def login():
 
 @auth_bp.route('/profile', methods=['GET'])
 @jwt_required()
+# Renvoie le profil connecté.
 def get_profile():
     """Get user profile"""
     try:
@@ -68,6 +73,7 @@ def get_profile():
 
 @auth_bp.route('/profile', methods=['PUT'])
 @jwt_required()
+# Met à jour le profil.
 def update_profile():
     """Update user profile"""
     try:
@@ -87,6 +93,7 @@ def update_profile():
 
 @auth_bp.route('/change-password', methods=['PUT'])
 @jwt_required()
+# Change le mot de passe.
 def change_password():
     """Change user password"""
     try:
@@ -112,6 +119,7 @@ def change_password():
 
 @auth_bp.route('/avatar', methods=['PUT'])
 @jwt_required()
+# Téléverse un avatar.
 def update_avatar():
     """Upload or replace the authenticated user's profile photo."""
     try:
@@ -135,6 +143,7 @@ def update_avatar():
         return jsonify({"error": "Failed to update profile photo"}), 500
 
 @auth_bp.route('/avatar/<path:filename>', methods=['GET'])
+# Sert un avatar depuis le disque.
 def serve_avatar(filename):
     """Serve stored profile photos."""
     upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
@@ -146,6 +155,7 @@ def serve_avatar(filename):
 
 @auth_bp.route('/deactivate', methods=['PUT'])
 @jwt_required()
+# Désactive l'utilisateur courant.
 def deactivate_account():
     """Deactivate user account"""
     try:

@@ -3,6 +3,8 @@
 Base Model for NAYA Travel Journal
 """
 
+# Modèle de base commun avec identifiants, dates et helpers.
+
 from datetime import datetime, date, timezone
 import uuid
 

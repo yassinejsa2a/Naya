@@ -3,6 +3,8 @@
 Photos API endpoints
 """
 
+# Routes photo pour CRUD et fichiers.
+
 import os
 
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
@@ -13,6 +15,7 @@ photos_bp = Blueprint('photos', __name__)
 photo_service = PhotoService()
 
 @photos_bp.route('', methods=['GET'])
+# Liste les photos.
 def get_photos():
     """Get photos with optional filters"""
     try:
@@ -50,6 +53,7 @@ def get_photos():
 
 @photos_bp.route('', methods=['POST'])
 @jwt_required()
+# Crée une photo + fichier.
 def create_photo():
     """Create new photo metadata"""
     try:
@@ -99,6 +103,7 @@ def create_photo():
         }), 500
 
 @photos_bp.route('/files/<path:filename>', methods=['GET'])
+# Sert le fichier photo.
 def serve_photo_file(filename):
     """Serve uploaded photo files."""
     upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
@@ -109,6 +114,7 @@ def serve_photo_file(filename):
     return send_from_directory(directory, filename)
 
 @photos_bp.route('/<photo_id>', methods=['GET'])
+# Récupère une photo.
 def get_photo(photo_id):
     """Get specific photo by ID"""
     try:
@@ -137,6 +143,7 @@ def get_photo(photo_id):
 
 @photos_bp.route('/<photo_id>', methods=['PUT'])
 @jwt_required()
+# Met à jour ses métadonnées.
 def update_photo(photo_id):
     """Update photo metadata (only by owner)"""
     try:
@@ -173,6 +180,7 @@ def update_photo(photo_id):
 
 @photos_bp.route('/<photo_id>', methods=['DELETE'])
 @jwt_required()
+# Supprime la photo.
 def delete_photo(photo_id):
     """Delete photo (only by owner)"""
     try:
@@ -208,6 +216,7 @@ def delete_photo(photo_id):
 
 @photos_bp.route('/orphaned', methods=['GET'])
 @jwt_required()
+# Liste les photos sans avis.
 def get_orphaned_photos():
     """Get photos not associated with any review (owner only)"""
     try:

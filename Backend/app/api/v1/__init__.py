@@ -3,6 +3,8 @@
 API v1 package initialization
 """
 
+# Enregistre toutes les blueprints v1.
+
 from flask import Blueprint
 
 def create_v1_blueprint():

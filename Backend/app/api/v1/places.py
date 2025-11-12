@@ -3,6 +3,8 @@
 Places API endpoints
 """
 
+# Routes lieux pour lister et gérer les destinations.
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.services.place_service import PlaceService
@@ -11,6 +13,7 @@ places_bp = Blueprint('places', __name__)
 place_service = PlaceService()
 
 @places_bp.route('', methods=['GET'])
+# Liste les lieux.
 def get_places():
     """Get places with optional filters"""
     try:
@@ -37,6 +40,7 @@ def get_places():
 
 @places_bp.route('', methods=['POST'])
 @jwt_required()
+# Crée un lieu.
 def create_place():
     """Create new place"""
     try:
@@ -67,6 +71,7 @@ def create_place():
         }), 500
 
 @places_bp.route('/<place_id>', methods=['GET'])
+# Récupère un lieu.
 def get_place(place_id):
     """Get specific place"""
     try:
@@ -93,6 +98,7 @@ def get_place(place_id):
 
 @places_bp.route('/<place_id>', methods=['PUT'])
 @jwt_required()
+# Met à jour un lieu.
 def update_place(place_id):
     """Update place"""
     try:
@@ -122,6 +128,7 @@ def update_place(place_id):
 
 @places_bp.route('/<place_id>', methods=['DELETE'])
 @jwt_required()
+# Supprime un lieu.
 def delete_place(place_id):
     """Delete place"""
     try:
@@ -148,6 +155,7 @@ def delete_place(place_id):
         }), 500
 
 @places_bp.route('/<place_id>/reviews', methods=['GET'])
+# Liste les avis du lieu.
 def get_place_reviews(place_id):
     """Get reviews for place"""
     try:
@@ -175,6 +183,7 @@ def get_place_reviews(place_id):
         }), 500
 
 @places_bp.route('/search', methods=['GET'])
+# Recherche des lieux.
 def search_places():
     """Search places"""
     try:

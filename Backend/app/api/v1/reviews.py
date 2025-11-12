@@ -3,6 +3,8 @@
 Reviews API endpoints
 """
 
+# Routes avis pour CRUD, likes et commentaires.
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, verify_jwt_in_request
 from app.services.review_service import ReviewService
@@ -11,6 +13,7 @@ reviews_bp = Blueprint('reviews', __name__)
 review_service = ReviewService()
 
 @reviews_bp.route('', methods=['GET'])
+# Liste les avis.
 def get_reviews():
     """Get reviews with optional filters"""
     current_user_id = None
@@ -58,6 +61,7 @@ def get_reviews():
 
 @reviews_bp.route('', methods=['POST'])
 @jwt_required()
+# Crée un avis.
 def create_review():
     """Create new review"""
     try:
@@ -91,6 +95,7 @@ def create_review():
         }), 500
 
 @reviews_bp.route('/<review_id>', methods=['GET'])
+# Récupère un avis.
 def get_review(review_id):
     """Get specific review by ID"""
     current_user_id = None
@@ -127,6 +132,7 @@ def get_review(review_id):
 
 @reviews_bp.route('/<review_id>', methods=['PUT'])
 @jwt_required()
+# Met à jour un avis.
 def update_review(review_id):
     """Update review (only by owner)"""
     try:
@@ -163,6 +169,7 @@ def update_review(review_id):
 
 @reviews_bp.route('/<review_id>', methods=['DELETE'])
 @jwt_required()
+# Supprime un avis.
 def delete_review(review_id):
     """Delete review (only by owner)"""
     try:
@@ -198,6 +205,7 @@ def delete_review(review_id):
 
 @reviews_bp.route('/<review_id>/likes', methods=['GET'])
 @jwt_required(optional=True)
+# Affiche les likes.
 def get_review_likes(review_id):
     try:
         current_user_id = get_jwt_identity()
@@ -211,6 +219,7 @@ def get_review_likes(review_id):
 
 @reviews_bp.route('/<review_id>/likes', methods=['POST'])
 @jwt_required()
+# Ajoute un like.
 def like_review_endpoint(review_id):
     try:
         user_id = get_jwt_identity()
@@ -224,6 +233,7 @@ def like_review_endpoint(review_id):
 
 @reviews_bp.route('/<review_id>/likes', methods=['DELETE'])
 @jwt_required()
+# Retire un like.
 def unlike_review_endpoint(review_id):
     try:
         user_id = get_jwt_identity()
@@ -237,6 +247,7 @@ def unlike_review_endpoint(review_id):
 
 @reviews_bp.route('/<review_id>/comments', methods=['GET'])
 @jwt_required(optional=True)
+# Liste les commentaires.
 def list_comments(review_id):
     try:
         limit = request.args.get('limit', type=int)
@@ -250,6 +261,7 @@ def list_comments(review_id):
 
 @reviews_bp.route('/<review_id>/comments', methods=['POST'])
 @jwt_required()
+# Ajoute un commentaire.
 def add_comment(review_id):
     try:
         user_id = get_jwt_identity()
@@ -265,6 +277,7 @@ def add_comment(review_id):
 
 @reviews_bp.route('/<review_id>/comments/<comment_id>', methods=['DELETE'])
 @jwt_required()
+# Supprime un commentaire.
 def delete_comment(review_id, comment_id):
     try:
         user_id = get_jwt_identity()
@@ -279,6 +292,7 @@ def delete_comment(review_id, comment_id):
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 @reviews_bp.route('/statistics/<place_id>', methods=['GET'])
+# Donne les stats du lieu.
 def get_place_statistics(place_id):
     """Get rating statistics for a place"""
     try:

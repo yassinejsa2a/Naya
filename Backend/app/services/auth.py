@@ -3,6 +3,8 @@
 Authentication Service for NAYA Travel Journal
 """
 
+# Gère inscription, connexion, profils, mots de passe et avatars.
+
 import os
 import uuid
 from datetime import timedelta
@@ -19,10 +21,12 @@ from app.services.review_service import ReviewService
 class AuthService:
     """Authentication service for user management"""
     
+    # Initialise les dépôts nécessaires.
     def __init__(self):
         self.user_repository = UserRepository()
         self.review_service = ReviewService()
     
+    # Crée les comptes utilisateurs.
     def register_user(self, user_data):
         """
         Register a new user
@@ -67,6 +71,7 @@ class AuthService:
             'user': created_user.to_dict()
         }
     
+    # Vérifie les identifiants et renvoie les tokens.
     def authenticate_user(self, login, password):
         """
         Authenticate user with email/username and password
@@ -115,11 +120,13 @@ class AuthService:
             'user': user.to_dict()
         }
     
+    # Lit la durée de vie des tokens.
     def _get_expiration(self, config_key, fallback):
         """Return JWT expiration delta from config with a sensible fallback."""
         value = current_app.config.get(config_key)
         return value if value is not None else fallback
     
+    # Renvoie le profil utilisateur.
     def get_user_profile(self, user_id):
         """
         Get user profile information
@@ -140,6 +147,7 @@ class AuthService:
         profile['liked_reviews_count'] = liked_summary.get('total', len(profile['liked_reviews']))
         return profile
     
+    # Met à jour le profil en toute sécurité.
     def update_user_profile(self, user_id, update_data):
         """
         Update user profile
@@ -182,6 +190,7 @@ class AuthService:
             'user': updated_user.to_dict()
         }
     
+    # Change le mot de passe après vérification.
     def change_password(self, user_id, old_password, new_password):
         """
         Change user password
@@ -212,6 +221,7 @@ class AuthService:
         
         return {'message': 'Password changed successfully'}
 
+    # Met à jour l'avatar.
     def update_profile_photo(self, user_id, file_storage):
         """
         Upload or replace the user's profile photo.
@@ -252,6 +262,7 @@ class AuthService:
             'user': user.to_dict(),
         }
 
+    # Liste les extensions autorisées.
     def _allowed_avatar_extensions(self):
         config_extensions = current_app.config.get('AVATAR_EXTENSIONS')
         if config_extensions:
@@ -261,12 +272,14 @@ class AuthService:
             return {ext.lower() for ext in fallback}
         return {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
+    # Valide l'extension du fichier.
     def _is_allowed_avatar_file(self, filename: str) -> bool:
         if '.' not in filename:
             return False
         extension = filename.rsplit('.', 1)[1].lower()
         return extension in self._allowed_avatar_extensions()
 
+    # Génère un nom unique.
     def _build_avatar_filename(self, original_name: str) -> str:
         extension = ''
         if '.' in original_name:
@@ -274,6 +287,7 @@ class AuthService:
         unique_id = uuid.uuid4().hex
         return f"{unique_id}.{extension}" if extension else unique_id
 
+    # Donne le dossier des avatars.
     def _avatar_storage_root(self) -> str:
         upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
         if os.path.isabs(upload_folder):
@@ -282,9 +296,11 @@ class AuthService:
             base_dir = os.path.join(current_app.root_path, upload_folder)
         return os.path.join(base_dir, 'avatars')
 
+    # Construit le chemin absolu.
     def _resolve_avatar_path(self, filename: str) -> str:
         return os.path.join(self._avatar_storage_root(), filename)
 
+    # Supprime l'ancien avatar.
     def _delete_avatar_file(self, stored_filename: Optional[str]) -> None:
         if not stored_filename:
             return
@@ -295,6 +311,7 @@ class AuthService:
         except OSError:
             pass
     
+    # Désactive un utilisateur.
     def deactivate_user(self, user_id):
         """
         Deactivate user account
@@ -312,6 +329,7 @@ class AuthService:
         
         return {'message': 'Account deactivated successfully'}
     
+    # Renvoie les stats utilisateur.
     def get_user_stats(self, user_id):
         """
         Get user statistics (reviews, photos count, etc.)
@@ -332,6 +350,7 @@ class AuthService:
             'member_since': user.created_at.isoformat() if user.created_at else None
         }
 
+    # Renvoie un profil public.
     def get_public_profile(self, user_id):
         """
         Return limited public profile information for a user.

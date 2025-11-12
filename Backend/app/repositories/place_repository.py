@@ -11,9 +11,11 @@ from app.repositories.base_repository import SQLAlchemyRepository
 class PlaceRepository(SQLAlchemyRepository):
     """Repository for Place model operations"""
     
+    # Cible le modèle Place.
     def __init__(self):
         super().__init__(Place)
     
+    # Cherche par nom.
     def get_by_name(self, name: str) -> Optional[Place]:
         """
         Get place by name
@@ -27,6 +29,7 @@ class PlaceRepository(SQLAlchemyRepository):
         except Exception:
             return None
     
+    # Liste par ville.
     def get_by_city(self, city: str, limit: Optional[int] = None) -> List[Place]:
         """
         Get places by city
@@ -44,6 +47,7 @@ class PlaceRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Liste par pays.
     def get_by_country(self, country: str, limit: Optional[int] = None) -> List[Place]:
         """
         Get places by country
@@ -61,6 +65,7 @@ class PlaceRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Recherche par texte.
     def search_places(self, search_term: str, limit: Optional[int] = None) -> List[Place]:
         """
         Search places by name, city, or country
@@ -86,6 +91,7 @@ class PlaceRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Trouve les lieux proches.
     def get_nearby_places(self, latitude: float, longitude: float, 
                          radius_km: float = 10.0, limit: Optional[int] = None) -> List[Place]:
         """
@@ -117,6 +123,7 @@ class PlaceRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Vérifie les doublons.
     def place_exists(self, name: str, city: str, country: str) -> bool:
         """
         Check if place already exists
@@ -129,6 +136,7 @@ class PlaceRepository(SQLAlchemyRepository):
         """
         return Place.query.filter_by(name=name, city=city, country=country).first() is not None
 
+    # Récupère par nom/ville/pays.
     def get_by_identity(self, name: str, city: str, country: str) -> Optional[Place]:
         """
         Get a place matching the exact name/city/country combination.

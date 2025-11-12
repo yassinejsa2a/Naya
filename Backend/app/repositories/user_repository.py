@@ -10,9 +10,11 @@ from app.repositories.base_repository import SQLAlchemyRepository
 class UserRepository(SQLAlchemyRepository):
     """User repository for data access operations"""
     
+    # Cible le modèle User.
     def __init__(self):
         super().__init__(User)
     
+    # Récupère par email.
     def get_by_email(self, email: str) -> Optional[User]:
         """
         Get user by email address
@@ -23,6 +25,7 @@ class UserRepository(SQLAlchemyRepository):
         """
         return self.get_by_attribute(email=email)
     
+    # Récupère par pseudo.
     def get_by_username(self, username: str) -> Optional[User]:
         """
         Get user by username

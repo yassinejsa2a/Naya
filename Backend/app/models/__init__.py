@@ -3,6 +3,8 @@
 Models package for NAYA Travel Journal
 """
 
+# Centralise les ORM pour des imports faciles.
+
 from .base_model import BaseModel
 from .user import User
 from .place import Place

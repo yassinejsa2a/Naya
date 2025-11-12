@@ -3,6 +3,8 @@
 Place Model for NAYA Travel Journal
 """
 
+# Contient les infos d'un lieu, ses coordonnées et avis.
+
 from app import db
 from app.models.base_model import BaseModel
 

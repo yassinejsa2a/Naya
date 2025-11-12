@@ -2,3 +2,5 @@
 """
 API package initialization
 """
+
+# Regroupe les blueprints API.

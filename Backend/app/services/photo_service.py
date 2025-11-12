@@ -3,6 +3,8 @@
 Photo Service for NAYA Travel Journal
 """
 
+# Gère les uploads photo et leurs métadonnées.
+
 import os
 import uuid
 from typing import List, Optional, Dict, Any
@@ -20,11 +22,13 @@ from app.repositories.review_repository import ReviewRepository
 class PhotoService:
     """Service for photo business logic"""
     
+    # Initialise les dépôts.
     def __init__(self):
         self.photo_repository = PhotoRepository()
         self.user_repository = UserRepository()
         self.review_repository = ReviewRepository()
     
+    # Crée une photo avec fichier.
     def create_photo(self, photo_data: Dict[str, Any], file_storage: Optional[FileStorage] = None) -> Dict[str, Any]:
         """
         Create a new photo record
@@ -98,6 +102,7 @@ class PhotoService:
         created_photo = self.photo_repository.create(photo)
         return self._build_photo_response(created_photo, user=user, review=review_obj)
     
+    # Récupère la photo avec ses liens.
     def get_photo_by_id(self, photo_id: str) -> Optional[Dict[str, Any]]:
         """
         Get photo by ID with user and review info
@@ -112,6 +117,7 @@ class PhotoService:
         
         return self._build_photo_response(photo)
     
+    # Met à jour si propriétaire/admin.
     def update_photo(self, photo_id: str, photo_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """
         Update photo metadata (only by owner)
@@ -160,6 +166,7 @@ class PhotoService:
             
         return self._build_photo_response(updated_photo)
 
+    # Supprime les photos d'un avis supprimé.
     def delete_photos_for_review(self, review_id: str) -> int:
         """Force delete every photo associated with a review."""
         photos = self.photo_repository.get_by_review(review_id)
@@ -172,6 +179,7 @@ class PhotoService:
             removed += 1
         return removed
     
+    # Supprime la photo et le fichier.
     def delete_photo(self, photo_id: str, user_id: str) -> bool:
         """
         Delete photo (only by owner)
@@ -201,6 +209,7 @@ class PhotoService:
             self._delete_file(photo.file_path)
         return removed
     
+    # Liste les photos d'un utilisateur.
     def get_photos_by_user(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Get photos by user with user and review info
@@ -223,6 +232,7 @@ class PhotoService:
         
         return result
 
+    # Fabrique un nom unique.
     def _build_unique_filename(self, original_name: str) -> str:
         """Build a unique filename preserving the extension."""
         extension = ''
@@ -231,12 +241,14 @@ class PhotoService:
         unique_id = uuid.uuid4().hex
         return f"{unique_id}.{extension}" if extension else unique_id
 
+    # Donne les extensions autorisées.
     def _allowed_extensions(self):
         config_extensions = current_app.config.get('ALLOWED_EXTENSIONS')
         if config_extensions:
             return {ext.lower() for ext in config_extensions}
         return {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
+    # Vérifie l'extension.
     def _allowed_file(self, filename: str) -> bool:
         """Check if the file extension is allowed."""
         if '.' not in filename:
@@ -244,6 +256,7 @@ class PhotoService:
         extension = filename.rsplit('.', 1)[1].lower()
         return extension in self._allowed_extensions()
 
+    # Calcule les chemins de stockage.
     def _resolve_storage_paths(self, filename: str):
         """Compute absolute storage path and relative DB path."""
         upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
@@ -257,10 +270,12 @@ class PhotoService:
         absolute_path = os.path.join(storage_dir, filename)
         return absolute_path, relative_path
 
+    # Sauvegarde le fichier.
     def _save_file(self, file_storage: FileStorage, destination: str) -> None:
         """Persist the uploaded file on disk."""
         file_storage.save(destination)
 
+    # Supprime le fichier.
     def _delete_file(self, file_path: Optional[str]) -> None:
         """Remove a file from disk if it exists."""
         if not file_path:
@@ -279,6 +294,7 @@ class PhotoService:
             except OSError:
                 pass
 
+    # Formate la réponse photo.
     def _build_photo_response(self, photo: Photo, user=None, review=None) -> Dict[str, Any]:
         """Build a serialisable representation for a photo instance."""
         data = photo.to_dict()
@@ -308,6 +324,7 @@ class PhotoService:
         data['caption'] = data.get('description')
         return data
     
+    # Liste les photos d'un avis.
     def get_photos_by_review(self, review_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Get photos by review with user and review info
@@ -325,6 +342,7 @@ class PhotoService:
         photos = self.photo_repository.get_by_review(review_id, limit)
         return [self._build_photo_response(photo, review=review) for photo in photos]
     
+    # Liste les photos récentes.
     def get_recent_photos(self, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Get recent photos with user and review info
@@ -336,6 +354,7 @@ class PhotoService:
         photos = self.photo_repository.get_recent_photos(limit)
         return [self._build_photo_response(photo) for photo in photos]
     
+    # Liste les photos sans avis.
     def get_orphaned_photos(self, user_id: str) -> List[Dict[str, Any]]:
         """
         Get photos not associated with any review (owner only)

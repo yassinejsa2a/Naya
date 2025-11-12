@@ -11,9 +11,11 @@ from app.repositories.base_repository import SQLAlchemyRepository
 class ReviewRepository(SQLAlchemyRepository):
     """Repository for Review model operations"""
     
+    # Cible le modèle Review.
     def __init__(self):
         super().__init__(Review)
     
+    # Liste les avis d'un utilisateur.
     def get_by_user(self, user_id: str, limit: Optional[int] = None) -> List[Review]:
         """
         Get reviews by user
@@ -31,6 +33,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Liste les avis d'un lieu.
     def get_by_place(self, place_id: str, limit: Optional[int] = None) -> List[Review]:
         """
         Get reviews for a place
@@ -48,6 +51,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Liste les avis les plus récents.
     def get_recent_reviews(self, limit: int = 10) -> List[Review]:
         """
         Get most recent reviews
@@ -61,6 +65,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Recherche des avis.
     def search_reviews(self, search_term: str, limit: Optional[int] = None) -> List[Review]:
         """
         Search reviews by title or content
@@ -91,6 +96,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return []
     
+    # Renvoie la note moyenne.
     def get_average_rating_for_place(self, place_id: str) -> Optional[float]:
         """
         Calculate average rating for a place
@@ -106,6 +112,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return None
     
+    # Compte les avis d'un lieu.
     def get_review_count_for_place(self, place_id: str) -> int:
         """
         Get number of reviews for a place
@@ -119,6 +126,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return 0
     
+    # Compte les avis d'un utilisateur.
     def get_review_count_for_user(self, user_id: str) -> int:
         """
         Get number of reviews by user
@@ -132,6 +140,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return 0
     
+    # Vérifie s'il existe déjà un avis.
     def user_has_reviewed_place(self, user_id: str, place_id: str) -> bool:
         """
         Check if user has already reviewed a place
@@ -146,6 +155,7 @@ class ReviewRepository(SQLAlchemyRepository):
         except Exception:
             return False
     
+    # Construit l'histogramme des notes.
     def get_rating_distribution_for_place(self, place_id: str) -> dict:
         """
         Get rating distribution for a place
